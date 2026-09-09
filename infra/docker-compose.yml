@@ -1,0 +1,33 @@
+# Run the built backend image locally, against the same Atlas cluster the
+# deployed app uses.
+#
+# The point of this file is to test the *image* before deploying it. Running
+# `uvicorn` from a source checkout exercises different code paths than a built
+# image: it silently picks up files that packaging might have left out, which is
+# exactly the class of bug this catches.
+#
+#   docker compose -f infra/docker-compose.yml up --build
+#   curl http://localhost:8000/ready
+
+services:
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../backend/.env
+    environment:
+      # Allow the Angular dev server to call this container directly.
+      CORS_ORIGINS: '["http://localhost:4200","http://127.0.0.1:4200"]'
+    healthcheck:
+      # /health deliberately does not touch MongoDB, so the container is
+      # reported healthy even while the database is unreachable. Use /ready to
+      # check dependencies.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped

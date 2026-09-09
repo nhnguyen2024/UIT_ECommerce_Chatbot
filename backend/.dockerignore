@@ -4,5 +4,8 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 *.pyc
+
+# Tests and evaluations are development tooling. They are not imported by the
+# application and pull the dataset and results into the image for no reason.
 tests/
 evals/

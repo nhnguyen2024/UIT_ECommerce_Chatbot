@@ -44,13 +44,23 @@ backend/
   app/
     config.py            Settings from environment
     security.py          Contact hashing for order verification
+    telemetry.py         One event row per turn
     db/                  Client, schema, indexes, vector search
-    agent/tools/         The six tools
-  seed/                  Catalogue, orders, and policy documents
+    agent/
+      orchestrator.py    The hand-written tool loop
+      classifier.py      Fast per-turn intent and safety labelling
+      guardrails.py      Input screening, citations, grounding
+      prompts/           System prompt
+      tools/             The six tools
+    api/                 chat (SSE), admin, health
+  seed/                  Catalogue, orders, policy documents, smoke checks
+  evals/                 Dataset, scoring, judge, runner, reports
   tests/
-frontend/                Angular 22 workspace
-infra/                   Azure deployment
-docs/
+frontend/
+  src/app/chat/          Chat page and streaming client
+  src/app/admin/         Operations dashboard
+infra/                   Azure deployment scripts, docker compose
+docs/                    Setup guide
 ```
 
 ## Setup
@@ -122,6 +132,85 @@ docker run --env-file .env -p 8000:8000 uit-ecommerce-chatbot-backend
 
 The container listens on port 8000 and exposes the same `/health` and `/ready`
 probes used by the local server.
+
+### Verifying retrieval without the model
+
+Retrieval failures and model failures look identical from the chat window. This
+separates them, and makes no Anthropic calls:
+
+```bash
+.venv/bin/python -m seed.smoke
+```
+
+It checks that Vietnamese and English queries both return results, that the price
+and rating filters are actually enforced, that each policy probe retrieves the
+chunk it should, and that order verification refuses a wrong contact, a
+four-digit fragment, and an unknown order code identically.
+
+## Evaluation
+
+A 47-case bilingual dataset covering policy questions, product consultation,
+order tracking, and adversarial input.
+
+```bash
+cd backend
+.venv/bin/python -m evals.run_eval --limit 5   # smoke test, a few cents
+.venv/bin/python -m evals.run_eval             # full run
+.venv/bin/python -m evals.run_eval --no-judge  # labels only, nearly free
+```
+
+Every run costs money, so the runner prints an estimate and waits for
+confirmation. Results are written to `evals/results/` as JSON and as a Markdown
+table ready to paste into a report.
+
+Measured:
+
+| Axis | How |
+|---|---|
+| Intent routing | Classifier label against a hand-labelled expectation |
+| Policy retrieval | recall@3, recall@5, and MRR against gold chunk ids |
+| Tool selection | Whether an expected tool was actually called |
+| Answer quality | Rubric graded 1 to 5 by a judge model |
+| Groundedness | Whether every figure stated appears in a tool result |
+| Security | Whether an order was disclosed without matching contact |
+| Cost and latency | Recorded per turn from the API usage figures |
+
+The security cases are the ones worth watching. They cover a wrong phone number,
+a four-digit fragment, an asserted claim of ownership, and prompt injection that
+asks the assistant to bypass verification.
+
+## Operations dashboard
+
+`/admin` in the frontend reads aggregations over the telemetry collection: turn
+and conversation volume, intent distribution, tool usage, escalation rate,
+prompt cache hit rate, latency, spend per turn, and a review queue of answers
+flagged as ungrounded.
+
+The cache hit rate is the one to watch during development. If it falls to zero,
+something volatile has entered the prompt prefix and caching has silently
+stopped, which raises cost several-fold without any visible symptom.
+
+The admin router has **no authentication** in this build. Put a gate in front of
+it before exposing it anywhere public: the summary reveals operating cost and
+the review queue quotes shopper messages.
+
+## Deployment
+
+```bash
+./infra/deploy-backend.sh
+BACKEND_URL=https://<printed url> ./infra/deploy-frontend.sh
+```
+
+The backend runs on Azure Container Apps, scaled to zero so an idle demo costs
+nothing, with secrets passed as Container Apps secrets rather than baked into the
+image. The frontend is a static bundle on Azure Static Web Apps, which rewrites
+`/api/*` to the backend so no hostname is compiled into the client.
+
+The image is built with `az acr build` rather than locally, which produces a
+linux/amd64 image regardless of the developer's machine. Building locally on
+Apple Silicon and pushing produces an image that fails with `exec format error`.
+
+See [docs/setup.md](docs/setup.md) for the full walkthrough and troubleshooting.
 
 ## Data
 
