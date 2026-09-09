@@ -26,6 +26,9 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 filterwarnings = ["ignore::DeprecationWarning"]
 
+[tool.setuptools.packages.find]
+include = ["app*", "seed*"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"

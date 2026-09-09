@@ -1,0 +1,49 @@
+<main class="shell">
+  <aside class="rail">
+    <div class="mark">A</div>
+    <div class="rail-copy">
+      <span class="eyebrow">ATELIER / 01</span>
+      <h1>Support, with<br /><em>some thought.</em></h1>
+      <p>Product advice, policies, and order help in one calm conversation.</p>
+    </div>
+    <div class="rail-footer"><span class="status-dot"></span> Live support desk</div>
+  </aside>
+
+  <section class="workspace">
+    <header class="topbar">
+      <div><span class="eyebrow">CUSTOMER CARE</span><strong>Conversation room</strong></div>
+      <button class="new-chat" type="button" (click)="reset()">New conversation <span>+</span></button>
+    </header>
+
+    <div class="conversation" aria-live="polite">
+      @for (message of messages(); track $index) {
+        <article class="message" [class.from-user]="message.role === 'user'">
+          <div class="message-meta">{{ message.role === 'user' ? 'YOU' : 'ATELIER' }} <span>{{ message.role === 'assistant' && message.pending ? 'THINKING' : '' }}</span></div>
+          <p class="message-text">{{ message.text }}<span class="cursor" [class.visible]="message.pending"></span></p>
+          @if (message.products?.length) {
+            <div class="product-grid">
+              @for (product of message.products; track product.sku) {
+                <div class="product-card">
+                  <div class="product-image">{{ product.brand?.slice(0, 1) ?? 'P' }}</div>
+                  <div><small>{{ product.brand ?? product.sku }}</small><strong>{{ product.name_en ?? product.name_vi ?? product.sku }}</strong><span>{{ formatPrice(product.sale_price ?? product.price) }}</span></div>
+                </div>
+              }
+            </div>
+          }
+          @if (message.citations?.length) {
+            <div class="citations">Sources: @for (citation of message.citations; track citation.source_id) { <span>{{ citation.source_id }}</span> }</div>
+          }
+        </article>
+      }
+      @if (error()) { <div class="error">{{ error() }}</div> }
+    </div>
+
+    <footer class="composer-wrap">
+      <div class="composer">
+        <textarea [(ngModel)]="draft" (keydown)="handleKeydown($event)" [disabled]="busy()" rows="1" placeholder="Ask about a product, policy, or order..."></textarea>
+        <button class="send" type="button" (click)="send()" [disabled]="busy() || !draft.trim()" aria-label="Send message">&#8599;</button>
+      </div>
+      <span>Enter to send · Your conversation stays private</span>
+    </footer>
+  </section>
+</main>

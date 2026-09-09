@@ -75,6 +75,11 @@ class TurnState:
     tools_used: list[str] = field(default_factory=list)
     tool_rounds: int = 0
     sources: set[str] = field(default_factory=set)
+    # The same identifiers as `sources`, but in the order the tools returned
+    # them. Citation validation only needs membership, so a set is enough there;
+    # measuring retrieval quality needs rank, because mean reciprocal rank is
+    # defined over an ordered list.
+    retrieved: list[str] = field(default_factory=list)
     tool_payloads: list[Any] = field(default_factory=list)
     products: list[dict] = field(default_factory=list)
     usage: UsageTotals = field(default_factory=UsageTotals)
@@ -249,6 +254,9 @@ async def run_turn(
             for block, (payload, is_error, sources, products) in zip(tool_uses, results):
                 state.tools_used.append(block.name)
                 state.sources.update(sources)
+                for source in sources:
+                    if source not in state.retrieved:
+                        state.retrieved.append(source)
                 state.tool_payloads.append(payload)
                 state.products.extend(products)
                 if block.name == "create_handoff" and not is_error:
@@ -349,6 +357,7 @@ def _done_event(
             "intent": state.intent,
             "confidence": state.confidence,
             "tools_used": state.tools_used,
+            "retrieved_sources": list(state.retrieved),
             "tool_rounds": state.tool_rounds,
             "latency_ms": int((time.perf_counter() - started) * 1000),
             "input_tokens": state.usage.input_tokens,

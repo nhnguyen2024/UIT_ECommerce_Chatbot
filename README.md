@@ -80,12 +80,48 @@ This generates the catalogue, orders, and policy chunks, writes them to MongoDB,
 
 ## Development
 
+Start the API from one terminal:
+
+```bash
+cd backend
+.venv/bin/uvicorn app.main:app --reload --port 8000
+```
+
+Start the Angular client from a second terminal:
+
+```bash
+cd frontend
+npm install
+npm start
+```
+
+The client is available at <http://localhost:4200>. Its development proxy forwards
+`/api` requests to FastAPI on port 8000. The backend health check is available at
+<http://localhost:8000/health>.
+
+Backend checks and local data inspection:
+
 ```bash
 .venv/bin/python -m pytest          # tests that need no database
 .venv/bin/python -m seed.catalog    # inspect the generated catalogue
 .venv/bin/python -m seed.orders     # inspect the generated orders
 .venv/bin/python -m seed.parse_policies
 ```
+
+Build the frontend for deployment with `npm run build` from `frontend/`.
+
+### Backend container
+
+With Docker Desktop or another Docker daemon running, build and run the API
+container from `backend/`:
+
+```bash
+docker build -t uit-ecommerce-chatbot-backend .
+docker run --env-file .env -p 8000:8000 uit-ecommerce-chatbot-backend
+```
+
+The container listens on port 8000 and exposes the same `/health` and `/ready`
+probes used by the local server.
 
 ## Data
 
