@@ -1,0 +1,159 @@
+<div class="page">
+  <header class="head">
+    <div>
+      <span class="eyebrow">ATELIER / OPERATIONS</span>
+      <h1>Support <em>dashboard</em></h1>
+    </div>
+    <div class="ranges">
+      @for (range of [1, 7, 30]; track range) {
+        <button type="button" [class.on]="days() === range" (click)="setRange(range)">
+          {{ range }}d
+        </button>
+      }
+      <button type="button" class="refresh" (click)="refresh()" [disabled]="loading()">
+        {{ loading() ? 'Loading' : 'Refresh' }}
+      </button>
+    </div>
+  </header>
+
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  } @else if (loading()) {
+    <p class="muted">Loading dashboard…</p>
+  } @else if (isEmpty()) {
+    <p class="muted">
+      No conversations recorded in this window. Start a chat, then come back.
+    </p>
+  } @else if (data(); as dashboard) {
+
+    <section class="tiles">
+      <article class="tile">
+        <span class="eyebrow">Conversations</span>
+        <strong>{{ dashboard.summary.sessions }}</strong>
+        <small>{{ dashboard.summary.turns }} turns</small>
+      </article>
+      <article class="tile">
+        <span class="eyebrow">Grounded answers</span>
+        <strong>{{ percent(groundedRate()) }}</strong>
+        <small>{{ dashboard.summary.ungrounded }} flagged for review</small>
+      </article>
+      <article class="tile">
+        <span class="eyebrow">Escalated to human</span>
+        <strong>{{ percent(escalationRate()) }}</strong>
+        <small>{{ dashboard.summary.escalations }} handoffs</small>
+      </article>
+      <article class="tile">
+        <span class="eyebrow">Median response</span>
+        <strong>{{ (dashboard.summary.avg_latency_ms / 1000).toFixed(1) }}s</strong>
+        <small>average per turn</small>
+      </article>
+      <article class="tile">
+        <span class="eyebrow">Spend</span>
+        <strong>{{ money(dashboard.summary.cost_usd) }}</strong>
+        <small>{{ money(dashboard.summary.cost_per_turn_usd) }} per turn</small>
+      </article>
+      <article class="tile">
+        <span class="eyebrow">Prompt cache</span>
+        <strong>{{ percent(dashboard.summary.cache_hit_rate) }}</strong>
+        <small>{{ compact(dashboard.summary.cache_read_tokens ?? 0) }} tokens reused</small>
+      </article>
+    </section>
+
+    @if (points().length > 1) {
+      <section class="panel">
+        <span class="eyebrow">Daily volume</span>
+        <svg class="chart" [attr.viewBox]="'0 0 ' + chartWidth + ' ' + chartHeight"
+             preserveAspectRatio="none" role="img" aria-label="Turns per day">
+          <path [attr.d]="areaPath()" class="area" />
+          <path [attr.d]="linePath()" class="line" />
+          @for (point of points(); track point.date) {
+            <circle [attr.cx]="point.x" [attr.cy]="point.y" r="3" class="dot">
+              <title>{{ point.date }}: {{ point.turns }} turns</title>
+            </circle>
+          }
+        </svg>
+        <div class="axis">
+          <span>{{ points()[0].date }}</span>
+          <span>{{ points()[points().length - 1].date }}</span>
+        </div>
+      </section>
+    }
+
+    <div class="columns">
+      <section class="panel">
+        <span class="eyebrow">What shoppers ask</span>
+        @for (bar of intentBars(); track bar.label) {
+          <div class="bar-row">
+            <div class="bar-label">{{ bar.label }}<span>{{ bar.caption }}</span></div>
+            <div class="bar-track"><div class="bar-fill" [style.width.%]="bar.width"></div></div>
+          </div>
+        } @empty {
+          <p class="muted">No intents recorded.</p>
+        }
+      </section>
+
+      <section class="panel">
+        <span class="eyebrow">Tool usage</span>
+        @for (bar of toolBars(); track bar.label) {
+          <div class="bar-row">
+            <div class="bar-label">{{ bar.label }}<span>{{ bar.caption }}</span></div>
+            <div class="bar-track"><div class="bar-fill alt" [style.width.%]="bar.width"></div></div>
+          </div>
+        } @empty {
+          <p class="muted">No tool calls recorded. A dead tool is worth investigating.</p>
+        }
+      </section>
+    </div>
+
+    <section class="panel">
+      <span class="eyebrow">Review queue</span>
+      <p class="note">
+        Turns whose answer stated a figure that appeared in no tool result, or that
+        errored. This is the quality feedback loop.
+      </p>
+      @if (dashboard.review.length) {
+        <table>
+          <thead>
+            <tr><th>When</th><th>Intent</th><th>Lang</th><th>Tools</th><th>Issue</th></tr>
+          </thead>
+          <tbody>
+            @for (row of dashboard.review; track row.session_id + row.at) {
+              <tr>
+                <td class="mono">{{ shortTime(row.at) }}</td>
+                <td>{{ row.intent.replace('_', ' ') }}</td>
+                <td class="mono">{{ row.lang }}</td>
+                <td class="mono">{{ row.tools_used.join(', ') || '—' }}</td>
+                <td>{{ row.error ? row.error : 'ungrounded figure' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      } @else {
+        <p class="muted">Nothing flagged. Every answer traced to a tool result.</p>
+      }
+    </section>
+
+    <section class="panel">
+      <span class="eyebrow">Open handoffs</span>
+      @if (dashboard.handoffs.length) {
+        <table>
+          <thead>
+            <tr><th>Ticket</th><th>Reason</th><th>Summary</th><th>Raised</th></tr>
+          </thead>
+          <tbody>
+            @for (row of dashboard.handoffs; track row.ticket_id) {
+              <tr>
+                <td class="mono">{{ row.ticket_id }}</td>
+                <td>{{ row.reason }}</td>
+                <td class="summary">{{ row.summary }}</td>
+                <td class="mono">{{ shortTime(row.created_at) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      } @else {
+        <p class="muted">No one is waiting for a human agent.</p>
+      }
+    </section>
+  }
+</div>

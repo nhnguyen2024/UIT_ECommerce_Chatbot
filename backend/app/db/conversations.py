@@ -12,10 +12,15 @@ replay them anyway.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
+
+from pymongo.errors import PyMongoError
 
 from app.db import schema
 from app.db.client import get_db
+
+logger = logging.getLogger(__name__)
 
 # How many past turns are replayed to the model. Long conversations stay cheap
 # and the model keeps enough context to resolve references like "the second one".
@@ -23,13 +28,28 @@ HISTORY_TURNS = 12
 
 
 async def get_history(session_id: str, limit: int = HISTORY_TURNS) -> list[dict]:
-    """Return the most recent turns, oldest first, ready for replay."""
-    document = await get_db()[schema.CONVERSATIONS].find_one(
-        {"session_id": session_id},
-        # Slice server-side so a long conversation does not travel over the wire
-        # in full just to have most of it discarded here.
-        {"_id": 0, "lang": 1, "escalated": 1, "messages": {"$slice": -limit}},
-    )
+    """Return the most recent turns, oldest first, ready for replay.
+
+    Never raises. Conversation history improves an answer but is not required to
+    produce one, so a database outage degrades the assistant to single-turn
+    replies rather than taking it offline. The alternative, letting the error
+    propagate, turns a brief Atlas blip into a chatbot that answers nothing.
+    """
+    try:
+        document = await get_db()[schema.CONVERSATIONS].find_one(
+            {"session_id": session_id},
+            # Slice server-side so a long conversation does not travel over the
+            # wire in full just to have most of it discarded here.
+            {"_id": 0, "lang": 1, "escalated": 1, "messages": {"$slice": -limit}},
+        )
+    except PyMongoError:
+        logger.warning(
+            "could not load history for session %s; continuing without it",
+            session_id,
+            exc_info=True,
+        )
+        return []
+
     if document is None:
         return []
     return [

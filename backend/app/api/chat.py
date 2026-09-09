@@ -18,6 +18,7 @@ import uuid
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from pymongo.errors import PyMongoError
 
 from app.agent.orchestrator import run_turn
 from app.db.conversations import append_turn, get_conversation, get_history
@@ -109,7 +110,16 @@ async def stream_chat(request: ChatRequest) -> StreamingResponse:
 @router.get("/{session_id}")
 async def read_conversation(session_id: str) -> dict:
     """Return a stored conversation so a reloaded page can restore it."""
-    conversation = await get_conversation(session_id)
+    try:
+        conversation = await get_conversation(session_id)
+    except PyMongoError as exc:
+        # 503 rather than 500: the service is fine, its datastore is not, and
+        # the client should retry rather than treat the session as broken.
+        logger.warning("conversation lookup failed for %s", session_id, exc_info=True)
+        raise HTTPException(
+            status_code=503, detail="Conversation store is unavailable"
+        ) from exc
+
     if conversation is None:
         raise HTTPException(status_code=404, detail="No such session")
     return conversation

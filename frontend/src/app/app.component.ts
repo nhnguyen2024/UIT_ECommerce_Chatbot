@@ -1,135 +1,32 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { ChatService, Citation, Product, StreamEvent } from './chat.service';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
-interface Message {
-  role: 'user' | 'assistant';
-  text: string;
-  citations?: Citation[];
-  products?: Product[];
-  pending?: boolean;
-}
-
+/** Application shell: a thin navigation bar over the routed page. */
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [FormsModule],
-  templateUrl: './app.component.html',
-  styleUrl: './app.component.css',
+  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  template: `
+    <nav class="nav">
+      <a routerLink="/" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: true }">Chat</a>
+      <a routerLink="/admin" routerLinkActive="on">Operations</a>
+    </nav>
+    <router-outlet />
+  `,
+  styles: [`
+    .nav {
+      position: fixed; top: 0; right: 0; z-index: 20;
+      display: flex; gap: 2px; padding: 10px 14px;
+    }
+    .nav a {
+      padding: 6px 13px; text-decoration: none;
+      font: 500 10px 'DM Mono', monospace; letter-spacing: .1em; text-transform: uppercase;
+      color: #8e9289; background: rgba(244,239,231,.82); border: 1px solid transparent;
+      backdrop-filter: blur(6px);
+    }
+    .nav a.on { color: #b47740; border-color: #ddd6cb; }
+    @media (max-width: 700px) { .nav { padding: 6px 8px; } .nav a { padding: 5px 9px; } }
+  `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AppComponent {
-  private readonly chat = inject(ChatService);
-  readonly sessionId = signal<string | null>(localStorage.getItem('atelier-session'));
-  readonly messages = signal<Message[]>([
-    {
-      role: 'assistant',
-      text: 'Xin chao. I can help you compare products, understand store policies, or check an order.',
-    },
-  ]);
-  readonly busy = signal(false);
-  readonly error = signal('');
-  draft = '';
-
-  constructor() {
-    const savedSession = this.sessionId();
-    if (savedSession) {
-      this.chat.getConversation(savedSession).subscribe({
-        next: (conversation) => {
-          if (conversation.messages.length) {
-            this.messages.set(conversation.messages.map((message) => ({
-              role: message.role,
-              text: message.text,
-              citations: message.citations,
-              products: message.products,
-            })));
-          }
-        },
-        error: () => {
-          localStorage.removeItem('atelier-session');
-          this.sessionId.set(null);
-        },
-      });
-    }
-  }
-
-  send(): void {
-    const message = this.draft.trim();
-    if (!message || this.busy()) return;
-
-    this.draft = '';
-    this.error.set('');
-    this.busy.set(true);
-    this.messages.update((items) => [
-      ...items,
-      { role: 'user', text: message },
-      { role: 'assistant', text: '', pending: true },
-    ]);
-
-    this.chat.stream(message, this.sessionId()).subscribe({
-      next: (event) => this.handleEvent(event),
-      error: () => {
-        this.busy.set(false);
-        this.error.set('The assistant is unavailable right now. Please try again.');
-        this.removePending();
-      },
-      complete: () => this.busy.set(false),
-    });
-  }
-
-  handleKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      this.send();
-    }
-  }
-
-  reset(): void {
-    localStorage.removeItem('atelier-session');
-    this.sessionId.set(null);
-    this.messages.set([{ role: 'assistant', text: 'A fresh conversation. What are you shopping for today?' }]);
-    this.error.set('');
-  }
-
-  private handleEvent(event: StreamEvent): void {
-    if (event.type === 'session' && event.session_id) {
-      this.sessionId.set(event.session_id);
-      localStorage.setItem('atelier-session', event.session_id);
-    }
-    if (event.type === 'text' && event.delta) {
-      this.messages.update((items) => this.updateLast(items, (last) => ({
-        ...last,
-        text: last.text + event.delta,
-      })));
-    }
-    if (event.type === 'products' && event.items) {
-      this.messages.update((items) => this.updateLast(items, (last) => ({
-        ...last,
-        products: event.items as Product[],
-      })));
-    }
-    if (event.type === 'citations' && event.items) {
-      this.messages.update((items) => this.updateLast(items, (last) => ({
-        ...last,
-        citations: event.items as Citation[],
-      })));
-    }
-    if (event.type === 'error') this.error.set(event.message ?? 'The assistant could not complete that request.');
-    if (event.type === 'done') {
-      this.messages.update((items) => this.updateLast(items, (last) => ({ ...last, text: event.text ?? last.text, pending: false })));
-    }
-  }
-
-  private updateLast(items: Message[], update: (last: Message) => Message): Message[] {
-    if (!items.length) return items;
-    return [...items.slice(0, -1), update(items[items.length - 1])];
-  }
-
-  private removePending(): void {
-    this.messages.update((items) => items.filter((item) => !item.pending));
-  }
-
-  formatPrice(value: number | undefined): string {
-    return value === undefined ? '' : new Intl.NumberFormat('vi-VN').format(value) + ' VND';
-  }
-}
+export class AppComponent {}
