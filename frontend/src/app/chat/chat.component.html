@@ -1,10 +1,10 @@
 <main class="shell">
   <aside class="rail">
-    <div class="mark">A</div>
+    <div class="mark">N</div>
     <div class="rail-copy">
-      <span class="eyebrow">ATELIER / 01</span>
+      <span class="eyebrow">NORTHLIGHT / 01</span>
       <h1>Support, with<br /><em>some thought.</em></h1>
-      <p>Product advice, policies, and order help in one calm conversation.</p>
+      <p>Phones, laptops, audio, and home tech. Advice, policies, and order help in one conversation.</p>
     </div>
     <div class="rail-footer"><span class="status-dot"></span> Live support desk</div>
   </aside>
@@ -18,7 +18,7 @@
     <div class="conversation" aria-live="polite">
       @for (message of messages(); track $index) {
         <article class="message" [class.from-user]="message.role === 'user'">
-          <div class="message-meta">{{ message.role === 'user' ? 'YOU' : 'ATELIER' }} <span>{{ message.role === 'assistant' && message.pending ? 'THINKING' : '' }}</span></div>
+          <div class="message-meta">{{ message.role === 'user' ? 'YOU' : 'NORTHLIGHT' }} <span>{{ message.role === 'assistant' && message.pending ? 'THINKING' : '' }}</span></div>
           <p class="message-text">{{ message.text }}<span class="cursor" [class.visible]="message.pending"></span></p>
           @if (message.products?.length) {
             <div class="product-grid">

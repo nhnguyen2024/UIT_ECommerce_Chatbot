@@ -33,6 +33,24 @@ HANDOFFS = "handoffs"
 
 Language = Literal["vi", "en"]
 
+# The catalogue's category slugs, in one place.
+#
+# Two things read this: the `search_products` tool exposes it as an enum so the
+# model cannot filter on a category that matches nothing, and the seed generator
+# is checked against it. Keeping two copies is how a renamed category turns into
+# a filter that silently returns zero results.
+PRODUCT_CATEGORIES = [
+    "phones",
+    "tablets",
+    "laptops",
+    "audio",
+    "wearables",
+    "televisions",
+    "home-appliances",
+    "accessories",
+]
+
+
 PolicyType = Literal["return", "warranty", "shipping", "payment", "privacy"]
 
 OrderStatus = Literal[

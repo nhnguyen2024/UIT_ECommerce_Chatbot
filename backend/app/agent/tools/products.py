@@ -10,18 +10,10 @@ from app.db import schema
 from app.db.client import get_db
 from app.db.vector import rrf_merge, text_stage, vector_stage
 
-# Slugs the model may filter on. Kept as an enum in the schema so the model
-# cannot invent a category that silently matches nothing.
-CATEGORIES = [
-    "phones",
-    "laptops",
-    "audio",
-    "mens-fashion",
-    "womens-fashion",
-    "footwear",
-    "home-appliances",
-    "watches",
-]
+# Slugs the model may filter on, exposed as an enum in the tool schema so it
+# cannot invent a category that silently matches nothing. Defined in db.schema
+# so the catalogue and the tool cannot drift apart.
+CATEGORIES = schema.PRODUCT_CATEGORIES
 
 # Fields returned to the model. Deliberately excludes `embedding_source`, which
 # is long, duplicated across languages, and useless to the model: including it

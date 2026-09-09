@@ -1,6 +1,15 @@
-# E-Commerce Support Chatbot
+# Northlight Support Chatbot
 
-A customer-support chatbot for an e-commerce platform, covering three jobs:
+A customer-support chatbot for **Northlight**, a fictional Vietnamese consumer
+electronics retailer. The catalogue covers phones, tablets, laptops, audio,
+wearables, televisions, home appliances, and charging accessories, in the mould
+of Thế Giới Di Động or FPT Shop.
+
+Electronics rather than general merchandise on purpose: warranty terms, return
+windows, and spec comparison all carry real weight on expensive goods, so all
+three jobs below have something substantial to work with.
+
+It covers three jobs:
 
 1. **Product consultation** — semantic and keyword search over a product catalogue, with filters on category, price, and rating.
 2. **Policy questions** — retrieval-augmented answers over store policy documents, where every claim cites the passage it came from.

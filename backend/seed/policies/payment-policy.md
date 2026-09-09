@@ -3,7 +3,7 @@ doc_id: payment-policy
 policy_type: payment
 title_vi: Chính sách thanh toán
 title_en: Payment Policy
-source_url: https://shop.example.vn/chinh-sach-thanh-toan
+source_url: https://northlight.example.vn/chinh-sach-thanh-toan
 updated_at: 2026-02-01
 ---
 

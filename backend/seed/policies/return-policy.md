@@ -3,7 +3,7 @@ doc_id: return-policy
 policy_type: return
 title_vi: Chính sách đổi trả hàng
 title_en: Return and Exchange Policy
-source_url: https://shop.example.vn/chinh-sach-doi-tra
+source_url: https://northlight.example.vn/chinh-sach-doi-tra
 updated_at: 2026-02-01
 ---
 
@@ -33,7 +33,7 @@ Sản phẩm được chấp nhận đổi trả khi đáp ứng đầy đủ c�
 3. Còn đầy đủ hộp, phụ kiện, quà tặng kèm và phiếu bảo hành nếu có.
 4. Có hóa đơn mua hàng hoặc mã đơn hàng hợp lệ.
 
-Sản phẩm thuộc nhóm đồ lót, đồ bơi, mỹ phẩm đã bóc niêm phong và thực phẩm chức năng không được đổi trả vì lý do vệ sinh, trừ khi sản phẩm bị lỗi từ nhà sản xuất.
+Tai nghe nhét tai đã bóc niêm phong không được đổi trả vì lý do vệ sinh. Phần mềm, thẻ cào và mã kích hoạt đã sử dụng cũng không được đổi trả, trừ khi sản phẩm bị lỗi từ nhà sản xuất.
 
 @en
 A product is eligible for return when all of the following conditions are met:
@@ -43,7 +43,7 @@ A product is eligible for return when all of the following conditions are met:
 3. The box, accessories, free gifts, and warranty card, if any, are complete.
 4. A valid invoice or order code is provided.
 
-Underwear, swimwear, cosmetics with a broken seal, and dietary supplements cannot be returned for hygiene reasons, unless the item has a manufacturing defect.
+In-ear headphones with a broken hygiene seal cannot be returned. Software, prepaid cards, and activation codes that have been used cannot be returned either, unless the item has a manufacturing defect.
 
 ## [request-process] Quy trình yêu cầu đổi trả | How to request a return
 

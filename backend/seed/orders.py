@@ -159,11 +159,11 @@ SHOWCASE = [
     ("DH2026090002", "0912345678", "binh.tran@example.com", "delivered",
      ["LAP-002"], 12),
     ("DH2026090003", "0987654321", "chi.le@example.com", "cancelled",
-     ["WDR-001", "SHO-001"], 8),
+     ["TAB-001", "ACC-001"], 8),
     ("DH2026090004", "0938111222", "dung.pham@example.com", "returned",
      ["KIT-002"], 25),
     ("DH2026090005", "0977333444", "ha.hoang@example.com", "packing",
-     ["MJK-000", "MJK-002", "WAT-000"], 1),
+     ["TVS-000", "ACC-002", "WAT-000"], 1),
 ]
 
 SHOWCASE_NAMES = {

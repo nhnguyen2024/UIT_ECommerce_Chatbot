@@ -3,7 +3,7 @@ doc_id: warranty-policy
 policy_type: warranty
 title_vi: Chính sách bảo hành
 title_en: Warranty Policy
-source_url: https://shop.example.vn/chinh-sach-bao-hanh
+source_url: https://northlight.example.vn/chinh-sach-bao-hanh
 updated_at: 2026-02-01
 ---
 
@@ -14,9 +14,10 @@ Thời hạn bảo hành được tính từ ngày giao hàng thành công:
 
 - Điện thoại, máy tính bảng, laptop: 12 tháng.
 - Tai nghe, loa, phụ kiện điện tử: 6 tháng.
-- Đồng hồ: 12 tháng cho bộ máy, không bảo hành dây và vỏ ngoài.
+- Đồng hồ thông minh và thiết bị đeo: 12 tháng cho thân máy, không bảo hành dây đeo.
+- Tivi: 24 tháng cho tấm nền và bo mạch.
 - Đồ gia dụng: 12 tháng.
-- Quần áo, giày dép, túi xách: không áp dụng bảo hành, chỉ áp dụng chính sách đổi trả.
+- Phụ kiện sạc, cáp và pin dự phòng: 12 tháng.
 
 Pin và bộ sạc là linh kiện tiêu hao, được bảo hành 3 tháng.
 
@@ -25,9 +26,10 @@ The warranty period is counted from the successful delivery date:
 
 - Phones, tablets, laptops: 12 months.
 - Headphones, speakers, electronic accessories: 6 months.
-- Watches: 12 months on the movement; straps and outer casing are excluded.
+- Smartwatches and wearables: 12 months on the body; straps are excluded.
+- Televisions: 24 months on the panel and mainboard.
 - Home appliances: 12 months.
-- Clothing, footwear, and bags: no warranty; the return policy applies instead.
+- Chargers, cables, and power banks: 12 months.
 
 Batteries and chargers are consumable parts and carry a 3 month warranty.
 

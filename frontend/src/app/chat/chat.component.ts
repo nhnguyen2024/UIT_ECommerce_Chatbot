@@ -20,11 +20,11 @@ interface Message {
 })
 export class ChatComponent {
   private readonly chat = inject(ChatService);
-  readonly sessionId = signal<string | null>(localStorage.getItem('atelier-session'));
+  readonly sessionId = signal<string | null>(localStorage.getItem('northlight-session'));
   readonly messages = signal<Message[]>([
     {
       role: 'assistant',
-      text: 'Xin chao. I can help you compare products, understand store policies, or check an order.',
+      text: 'Xin chào. Mình có thể tư vấn sản phẩm, giải đáp chính sách hoặc tra cứu đơn hàng giúp bạn. / I can help you compare products, understand our policies, or check an order.',
     },
   ]);
   readonly busy = signal(false);
@@ -46,7 +46,7 @@ export class ChatComponent {
           }
         },
         error: () => {
-          localStorage.removeItem('atelier-session');
+          localStorage.removeItem('northlight-session');
           this.sessionId.set(null);
         },
       });
@@ -85,16 +85,16 @@ export class ChatComponent {
   }
 
   reset(): void {
-    localStorage.removeItem('atelier-session');
+    localStorage.removeItem('northlight-session');
     this.sessionId.set(null);
-    this.messages.set([{ role: 'assistant', text: 'A fresh conversation. What are you shopping for today?' }]);
+    this.messages.set([{ role: 'assistant', text: 'Cuộc trò chuyện mới. Bạn đang tìm sản phẩm gì? / A fresh conversation. What are you looking for?' }]);
     this.error.set('');
   }
 
   private handleEvent(event: StreamEvent): void {
     if (event.type === 'session' && event.session_id) {
       this.sessionId.set(event.session_id);
-      localStorage.setItem('atelier-session', event.session_id);
+      localStorage.setItem('northlight-session', event.session_id);
     }
     if (event.type === 'text' && event.delta) {
       this.messages.update((items) => this.updateLast(items, (last) => ({

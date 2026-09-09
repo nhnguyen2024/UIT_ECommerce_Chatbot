@@ -9,12 +9,12 @@ export const routes: Routes = [
   {
     path: '',
     loadComponent: () => import('./chat/chat.component').then((m) => m.ChatComponent),
-    title: 'Atelier Support',
+    title: 'Northlight Support',
   },
   {
     path: 'admin',
     loadComponent: () => import('./admin/admin.component').then((m) => m.AdminComponent),
-    title: 'Atelier Support · Operations',
+    title: 'Northlight Support · Operations',
   },
   { path: '**', redirectTo: '' },
 ];

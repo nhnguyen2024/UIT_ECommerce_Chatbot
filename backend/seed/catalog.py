@@ -76,7 +76,10 @@ def shared_lines(
 ) -> dict[str, list[tuple[str, str]]]:
     """For categories where the product name is generic rather than a brand line.
 
-    A jacket is "Ao khoac du" whoever makes it, so every brand shares one list.
+    An air fryer is "Noi chien khong dau" whoever makes it, so every brand in
+    that category shares one list of product names. Categories where the model
+    line belongs to the brand, such as phones or laptops, must not use this:
+    pairing them at random produces nonsense like "vivo Redmi Note".
     """
     return {brand: lines for brand in brands}
 
@@ -216,150 +219,139 @@ TEMPLATES: list[CategoryTemplate] = [
         warranty_months=6,
     ),
     CategoryTemplate(
-        slug="mens-fashion",
-        subcategory_slug="jackets",
-        category_vi="Thời trang nam",
-        category_en="Men's fashion",
-        subcategory_vi="Áo khoác",
-        subcategory_en="Jackets",
-        code="MJK",
-        brand_lines=shared_lines(
-            ["Routine", "Yame", "Coolmate", "Owen", "Aristino"],
-            [("Áo khoác dù", "Windbreaker Jacket"), ("Áo khoác bomber", "Bomber Jacket"),
-             ("Áo khoác jean", "Denim Jacket"), ("Áo hoodie", "Hoodie")],
-        ),
-        variants=[("", ""), ("form rộng", "oversized"), ("2 lớp", "double-layer"),
-                  ("có mũ", "hooded")],
-        price_range=(199_000, 1_290_000),
-        attributes={
-            "material": translated("Chất liệu", "Material",
-                                   ("Vải dù", "Parachute fabric"),
-                                   ("Kaki cotton", "Cotton khaki"),
-                                   ("Nỉ bông", "Fleece"),
-                                   ("Jean cotton", "Cotton denim")),
-            "sizes": same("Kích cỡ", "Sizes", "S, M, L, XL", "M, L, XL, XXL"),
-            "colours": translated("Màu sắc", "Colours",
-                                  ("Đen, Xám, Navy", "Black, Grey, Navy"),
-                                  ("Đen, Be, Rêu", "Black, Beige, Olive"),
-                                  ("Trắng, Đen", "White, Black")),
-            "fit": translated("Kiểu dáng", "Fit",
-                              ("Form regular", "Regular fit"),
-                              ("Form rộng", "Relaxed fit"),
-                              ("Form ôm", "Slim fit")),
-            "season": translated("Mùa", "Season",
-                                 ("Thu đông", "Autumn and winter"),
-                                 ("Bốn mùa", "All seasons")),
-        },
-        blurb_vi=(
-            "Áo khoác nam dáng trẻ trung, chất vải dày dặn giữ ấm tốt nhưng vẫn thoáng khi mặc "
-            "trong nhà. Dễ phối cùng quần jean hoặc quần âu, mặc đi học đi làm và đi chơi đều hợp. "
-            "Đường may chắc chắn, ít nhăn, giặt máy được."
-        ),
-        blurb_en=(
-            "Men's jacket with a youthful cut and substantial fabric that keeps you warm outdoors "
-            "yet stays breathable indoors. Pairs easily with jeans or chinos for class, work, or "
-            "going out. Sturdy stitching, wrinkle resistant, machine washable."
-        ),
-        tags_vi=["áo khoác nam", "giữ ấm", "mùa đông", "thời trang nam"],
-        tags_en=["men's jacket", "warm", "winter", "men's fashion"],
-        warranty_months=0,
-    ),
-    CategoryTemplate(
-        slug="womens-fashion",
-        subcategory_slug="dresses",
-        category_vi="Thời trang nữ",
-        category_en="Women's fashion",
-        subcategory_vi="Váy và đầm",
-        subcategory_en="Dresses and skirts",
-        code="WDR",
-        brand_lines=shared_lines(
-            ["Elise", "IVY moda", "NEM", "Vascara", "Hnoss"],
-            [("Đầm suông", "Shift Dress"), ("Đầm xòe", "A-line Dress"),
-             ("Chân váy midi", "Midi Skirt"), ("Đầm công sở", "Office Dress")],
-        ),
-        variants=[("", ""), ("tay dài", "long sleeve"), ("cổ vuông", "square neck"),
-                  ("phối bèo", "ruffled")],
-        price_range=(349_000, 2_490_000),
-        attributes={
-            "material": translated("Chất liệu", "Material",
-                                   ("Lụa tằm", "Mulberry silk"),
-                                   ("Voan", "Chiffon"),
-                                   ("Cotton lạnh", "Cool cotton"),
-                                   ("Tuyết mưa", "Crepe")),
-            "sizes": same("Kích cỡ", "Sizes", "S, M, L", "S, M, L, XL"),
-            "colours": translated("Màu sắc", "Colours",
-                                  ("Đen, Trắng, Hồng", "Black, White, Pink"),
-                                  ("Xanh navy, Be", "Navy, Beige"),
-                                  ("Đỏ đô, Đen", "Burgundy, Black")),
-            "occasion": translated("Dịp mặc", "Occasion",
-                                   ("Công sở", "Office"),
-                                   ("Dạo phố", "Casual outings"),
-                                   ("Dự tiệc", "Parties")),
-            "length": translated("Chiều dài", "Length",
-                                 ("Trên gối", "Above the knee"),
-                                 ("Ngang gối", "Knee length"),
-                                 ("Midi", "Midi")),
-        },
-        blurb_vi=(
-            "Đầm nữ thiết kế thanh lịch, chất vải mềm rũ không bí khi mặc cả ngày. Phom dáng tôn "
-            "eo, che khuyết điểm bắp tay, phù hợp mặc đi làm và dự tiệc nhẹ. Có thể phối cùng "
-            "blazer khi trời lạnh."
-        ),
-        blurb_en=(
-            "Elegant women's dress in a soft, draping fabric that stays comfortable all day. The "
-            "silhouette flatters the waist and softens the upper arms, suitable for the office and "
-            "for informal events. Layer with a blazer in cooler weather."
-        ),
-        tags_vi=["đầm nữ", "công sở", "thời trang nữ", "dự tiệc"],
-        tags_en=["women's dress", "office wear", "women's fashion", "party"],
-        warranty_months=0,
-    ),
-    CategoryTemplate(
-        slug="footwear",
-        subcategory_slug="trainers",
-        category_vi="Giày dép",
-        category_en="Footwear",
-        subcategory_vi="Giày thể thao",
-        subcategory_en="Trainers",
-        code="SHO",
+        slug="tablets",
+        subcategory_slug="tablets",
+        category_vi="Máy tính bảng",
+        category_en="Tablets",
+        subcategory_vi="Máy tính bảng",
+        subcategory_en="Tablets",
+        code="TAB",
         brand_lines={
-            "Biti's": [("Hunter", "Hunter"), ("Hunter Street", "Hunter Street")],
-            "Ananas": [("Basas", "Basas"), ("Urbas", "Urbas")],
-            "Vento": [("Runner", "Runner"), ("Sandal", "Sandal")],
-            "Converse": [("Chuck Taylor", "Chuck Taylor"), ("Run Star", "Run Star")],
+            "Samsung": [("Galaxy Tab A", "Galaxy Tab A"), ("Galaxy Tab S", "Galaxy Tab S")],
+            "Xiaomi": [("Pad", "Pad"), ("Redmi Pad", "Redmi Pad")],
+            "Lenovo": [("Tab M", "Tab M"), ("Tab P", "Tab P")],
+            "TCL": [("Tab", "Tab"), ("NxtPaper", "NxtPaper")],
+            "Nokia": [("T", "T")],
         },
-        variants=[("", ""), ("Low", "Low"), ("High", "High"), ("Lite", "Lite")],
-        price_range=(320_000, 3_490_000),
+        variants=[("", ""), ("Plus", "Plus"), ("Lite", "Lite"), ("5G", "5G")],
+        price_range=(3_290_000, 21_990_000),
         attributes={
-            "material": translated("Chất liệu", "Material",
-                                   ("Vải canvas", "Canvas"),
-                                   ("Da tổng hợp", "Synthetic leather"),
-                                   ("Lưới thoáng khí", "Breathable mesh")),
-            "sizes": same("Kích cỡ", "Sizes", "36-43", "38-45", "35-40"),
-            "sole": translated("Đế giày", "Sole",
-                               ("Đế cao su", "Rubber sole"),
-                               ("Đế phylon", "Phylon sole"),
-                               ("Đế IP", "IP sole")),
-            "colours": translated("Màu sắc", "Colours",
-                                  ("Trắng, Đen", "White, Black"),
-                                  ("Đen, Xám, Trắng", "Black, Grey, White"),
-                                  ("Be, Xanh", "Beige, Blue")),
-            "cut": translated("Kiểu", "Cut",
-                              ("Cổ thấp", "Low top"),
-                              ("Cổ cao", "High top")),
+            "screen": same("Màn hình", "Display",
+                           '10.1" LCD', '10.9" LCD 90Hz', '11" AMOLED 120Hz', '12.4" AMOLED'),
+            "storage": same("Bộ nhớ trong", "Storage", "64GB", "128GB", "256GB", "512GB"),
+            "ram": same("RAM", "RAM", "4GB", "6GB", "8GB", "12GB"),
+            "battery": same("Pin", "Battery", "7040 mAh", "8000 mAh", "10090 mAh"),
+            "stylus": translated("Bút cảm ứng", "Stylus",
+                                 ("Kèm bút", "Included"),
+                                 ("Hỗ trợ, mua rời", "Supported, sold separately"),
+                                 ("Không hỗ trợ", "Not supported")),
         },
         blurb_vi=(
-            "Giày thể thao nhẹ, đế êm, đi bộ nhiều không mỏi chân. Phần thân lưới thoáng khí giảm "
-            "hầm bí khi trời nóng. Dễ phối đồ, dùng được cả khi đi học, đi làm và tập luyện nhẹ."
+            "Máy tính bảng màn hình lớn cho việc học trực tuyến, ghi chú và xem phim. Loa kép "
+            "nghe rõ khi họp nhóm, pin đủ dùng qua vài tiết học liên tiếp. Bản có hỗ trợ bút phù "
+            "hợp cho sinh viên hay vẽ hoặc ghi chép tay trực tiếp lên bài giảng."
         ),
         blurb_en=(
-            "Lightweight trainers with a cushioned sole that stay comfortable over long walks. The "
-            "breathable mesh upper reduces heat build-up. Easy to style for class, work, or light "
-            "training."
+            "Large-screen tablet for online classes, note taking, and watching films. Stereo "
+            "speakers stay clear in a group call, and the battery lasts several lessons back to "
+            "back. The stylus-capable models suit students who sketch or annotate lecture slides."
         ),
-        tags_vi=["giày thể thao", "đi bộ", "thoáng khí"],
-        tags_en=["trainers", "sneakers", "walking", "breathable"],
-        warranty_months=0,
+        tags_vi=["máy tính bảng", "học online", "ghi chú", "giải trí", "pin lâu"],
+        tags_en=["tablet", "online study", "note taking", "entertainment", "long battery"],
+        warranty_months=12,
+    ),
+    CategoryTemplate(
+        slug="televisions",
+        subcategory_slug="smart-tvs",
+        category_vi="Tivi",
+        category_en="Televisions",
+        subcategory_vi="Tivi thông minh",
+        subcategory_en="Smart TVs",
+        code="TVS",
+        brand_lines={
+            "Samsung": [("Crystal UHD", "Crystal UHD"), ("QLED", "QLED")],
+            "LG": [("UHD", "UHD"), ("NanoCell", "NanoCell")],
+            "Sony": [("Bravia", "Bravia")],
+            "TCL": [("P", "P"), ("C", "C")],
+            "Casper": [("Smart TV", "Smart TV")],
+            "Coocaa": [("S", "S")],
+        },
+        variants=[("43 inch", "43 inch"), ("50 inch", "50 inch"),
+                  ("55 inch", "55 inch"), ("65 inch", "65 inch")],
+        price_range=(5_490_000, 32_990_000),
+        attributes={
+            "resolution": same("Độ phân giải", "Resolution", "Full HD", "4K UHD", "8K"),
+            "panel": translated("Tấm nền", "Panel type",
+                                ("LED viền", "Edge-lit LED"),
+                                ("QLED chấm lượng tử", "QLED"),
+                                ("OLED", "OLED")),
+            "refresh_rate": same("Tần số quét", "Refresh rate", "50Hz", "60Hz", "120Hz"),
+            "os": same("Hệ điều hành", "Operating system",
+                       "Google TV", "Tizen", "webOS", "Android TV"),
+            "hdmi_ports": same("Cổng HDMI", "HDMI ports", "2", "3", "4"),
+        },
+        blurb_vi=(
+            "Tivi thông minh cho phòng khách gia đình, cài sẵn các ứng dụng xem phim và điều khiển "
+            "bằng giọng nói tiếng Việt. Góc nhìn rộng nên cả nhà ngồi hai bên vẫn thấy rõ. Có cổng "
+            "HDMI để cắm máy chơi game hoặc loa thanh."
+        ),
+        blurb_en=(
+            "Smart television for a family living room, with streaming apps preinstalled and "
+            "Vietnamese voice control. Wide viewing angles keep the picture clear for people "
+            "sitting off to the side. HDMI ports for a games console or a soundbar."
+        ),
+        tags_vi=["tivi", "smart tv", "gia đình", "xem phim", "4k"],
+        tags_en=["television", "smart tv", "family", "streaming", "4k"],
+        warranty_months=24,
+    ),
+    CategoryTemplate(
+        slug="accessories",
+        subcategory_slug="power-and-charging",
+        category_vi="Phụ kiện",
+        category_en="Accessories",
+        subcategory_vi="Nguồn và sạc",
+        subcategory_en="Power and charging",
+        code="ACC",
+        # Deliberately the cheapest category. Without it every product costs
+        # millions of dong and a shopper on a small budget has nothing to be
+        # recommended, which makes the price filter impossible to demonstrate.
+        brand_lines={
+            "Anker": [("PowerCore", "PowerCore"), ("Nano", "Nano")],
+            "Baseus": [("Bipow", "Bipow"), ("GaN", "GaN")],
+            "Ugreen": [("Nexode", "Nexode"), ("Sạc nhanh", "Fast Charger")],
+            "Xiaomi": [("Mi Power Bank", "Mi Power Bank")],
+            "Belkin": [("BoostCharge", "BoostCharge")],
+        },
+        variants=[("", ""), ("Pro", "Pro"), ("Mini", "Mini"), ("Duo", "Duo")],
+        price_range=(129_000, 1_890_000),
+        attributes={
+            "product_type": translated("Loại phụ kiện", "Accessory type",
+                                       ("Pin dự phòng", "Power bank"),
+                                       ("Củ sạc nhanh", "Fast charger"),
+                                       ("Cáp sạc", "Charging cable"),
+                                       ("Sạc không dây", "Wireless charger")),
+            "capacity": same("Dung lượng", "Capacity",
+                             "10000 mAh", "20000 mAh", "Không áp dụng"),
+            "output": same("Công suất", "Output", "20W", "30W", "45W", "65W", "100W"),
+            "ports": same("Cổng kết nối", "Ports",
+                          "USB-C", "USB-C + USB-A", "2x USB-C + USB-A"),
+            "warranty_note": translated("Bảo hành", "Warranty",
+                                        ("12 tháng", "12 months"),
+                                        ("18 tháng", "18 months")),
+        },
+        blurb_vi=(
+            "Phụ kiện sạc dùng hằng ngày, nhỏ gọn bỏ vừa túi xách hoặc balo đi học. Có mạch bảo "
+            "vệ chống quá nhiệt và quá dòng, sạc được cả điện thoại lẫn tai nghe. Phù hợp mang "
+            "theo khi đi học cả ngày hoặc đi công tác ngắn."
+        ),
+        blurb_en=(
+            "Everyday charging accessory, compact enough for a handbag or a school backpack. "
+            "Protection circuitry guards against overheating and overcurrent, and it charges "
+            "phones and earbuds alike. Suited to a full day out or a short business trip."
+        ),
+        tags_vi=["phụ kiện", "pin dự phòng", "sạc nhanh", "giá rẻ", "gọn nhẹ"],
+        tags_en=["accessory", "power bank", "fast charging", "affordable", "compact"],
+        warranty_months=12,
     ),
     CategoryTemplate(
         slug="home-appliances",
@@ -408,49 +400,50 @@ TEMPLATES: list[CategoryTemplate] = [
         tags_en=["home appliance", "kitchen", "family", "convenient"],
     ),
     CategoryTemplate(
-        slug="watches",
-        subcategory_slug="wristwatches",
-        category_vi="Đồng hồ",
-        category_en="Watches",
-        subcategory_vi="Đồng hồ đeo tay",
-        subcategory_en="Wristwatches",
+        slug="wearables",
+        subcategory_slug="smartwatches",
+        category_vi="Thiết bị đeo",
+        category_en="Wearables",
+        subcategory_vi="Đồng hồ thông minh",
+        subcategory_en="Smartwatches",
         code="WAT",
         brand_lines={
-            "Casio": [("MTP", "MTP"), ("LTP", "LTP")],
-            "Citizen": [("Eco-Drive", "Eco-Drive"), ("Quartz", "Quartz")],
-            "Orient": [("Bambino", "Bambino"), ("Mako", "Mako")],
-            "Daniel Wellington": [("Petite", "Petite"), ("Classic", "Classic")],
-            "Curnon": [("Kepler", "Kepler"), ("Aurora", "Aurora")],
+            "Samsung": [("Galaxy Watch", "Galaxy Watch"), ("Galaxy Fit", "Galaxy Fit")],
+            "Xiaomi": [("Smart Band", "Smart Band"), ("Watch S", "Watch S")],
+            "Huawei": [("Watch GT", "Watch GT"), ("Band", "Band")],
+            "Garmin": [("Forerunner", "Forerunner"), ("Venu", "Venu")],
+            "Amazfit": [("GTS", "GTS"), ("Bip", "Bip")],
         },
-        variants=[("", ""), ("Nam", "Men"), ("Nữ", "Women"), ("Automatic", "Automatic")],
-        price_range=(890_000, 9_990_000),
+        variants=[("", ""), ("Pro", "Pro"), ("Active", "Active"), ("Lite", "Lite")],
+        price_range=(690_000, 12_990_000),
         attributes={
-            "movement": translated("Loại máy", "Movement",
-                                   ("Quartz pin", "Battery quartz"),
-                                   ("Automatic cơ", "Mechanical automatic"),
-                                   ("Năng lượng ánh sáng", "Solar powered")),
-            "case_size": same("Đường kính mặt", "Case diameter", "32mm", "36mm", "40mm", "42mm"),
-            "strap": translated("Chất liệu dây", "Strap material",
-                                ("Dây da", "Leather strap"),
-                                ("Dây thép không gỉ", "Stainless steel bracelet"),
-                                ("Dây vải", "Fabric strap")),
-            "water_resistance": same("Chống nước", "Water resistance", "3ATM", "5ATM", "10ATM"),
-            "crystal": translated("Kính", "Crystal",
-                                  ("Kính khoáng", "Mineral crystal"),
-                                  ("Kính sapphire", "Sapphire crystal")),
+            "display": same("Màn hình", "Display",
+                            '1.47" AMOLED', '1.62" AMOLED', '1.43" AMOLED', '1.09" TFT'),
+            "battery_life": translated("Thời lượng pin", "Battery life",
+                                       ("3 ngày", "3 days"), ("7 ngày", "7 days"),
+                                       ("14 ngày", "14 days")),
+            "health_sensors": translated("Cảm biến sức khỏe", "Health sensors",
+                                         ("Nhịp tim, SpO2", "Heart rate, SpO2"),
+                                         ("Nhịp tim, SpO2, giấc ngủ", "Heart rate, SpO2, sleep"),
+                                         ("Nhịp tim", "Heart rate")),
+            "gps": translated("Định vị", "GPS",
+                              ("GPS tích hợp", "Built-in GPS"),
+                              ("Dùng GPS của điện thoại", "Uses phone GPS")),
+            "water_resistance": same("Chống nước", "Water resistance", "5ATM", "3ATM", "IP68"),
         },
         blurb_vi=(
-            "Đồng hồ thiết kế tối giản, mặt số dễ đọc, phù hợp đeo đi học và đi làm. Dây tháo lắp "
-            "nhanh nên đổi phong cách dễ dàng. Khả năng chống nước đủ dùng khi rửa tay và đi mưa "
-            "nhẹ, không dùng khi bơi lặn."
+            "Đồng hồ thông minh theo dõi bước chân, nhịp tim và giấc ngủ, hiển thị thông báo từ "
+            "điện thoại ngay trên cổ tay. Pin dùng nhiều ngày nên không phải sạc mỗi tối. Bản có "
+            "GPS tích hợp phù hợp cho người chạy bộ không muốn mang theo điện thoại."
         ),
         blurb_en=(
-            "Minimalist watch with a legible dial, suitable for class and the office. The "
-            "quick-release strap makes it easy to change style. Water resistance covers hand "
-            "washing and light rain, but not swimming or diving."
+            "Smartwatch tracking steps, heart rate, and sleep, with phone notifications on your "
+            "wrist. The battery runs for days, so there is no nightly charge. Models with "
+            "built-in GPS suit runners who would rather leave the phone at home."
         ),
-        tags_vi=["đồng hồ", "tối giản", "quà tặng"],
-        tags_en=["watch", "minimalist", "gift"],
+        tags_vi=["đồng hồ thông minh", "sức khỏe", "thể thao", "theo dõi giấc ngủ", "chống nước"],
+        tags_en=["smartwatch", "health", "fitness", "sleep tracking", "water resistant"],
+        warranty_months=12,
     ),
 ]
 

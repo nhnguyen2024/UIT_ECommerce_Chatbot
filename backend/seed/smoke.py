@@ -43,7 +43,7 @@ def report(label: str, ok: bool, detail: str = "") -> bool:
 async def check_products(context: ToolContext) -> bool:
     ok = True
 
-    result = await search_products(context=context, query="áo khoác nam giữ ấm", limit=3)
+    result = await search_products(context=context, query="tai nghe chống ồn cho sinh viên", limit=3)
     hits = result.data.get("products", [])
     ok &= report(
         "search_products: Vietnamese query returns results",
@@ -63,7 +63,7 @@ async def check_products(context: ToolContext) -> bool:
     # The filter is the part most likely to be wrong: a price filter that does
     # not apply is invisible until a shopper is quoted something unaffordable.
     filtered = await search_products(
-        context=context, query="áo khoác", max_price=500_000, limit=5
+        context=context, query="pin dự phòng", max_price=500_000, limit=5
     )
     results = filtered.data.get("products", [])
     # The check is on the effective price, not the list price. The index filters

@@ -3,7 +3,7 @@ doc_id: privacy-policy
 policy_type: privacy
 title_vi: Chính sách bảo mật thông tin khách hàng
 title_en: Customer Privacy Policy
-source_url: https://shop.example.vn/chinh-sach-bao-mat
+source_url: https://northlight.example.vn/chinh-sach-bao-mat
 updated_at: 2026-02-01
 ---
 
@@ -75,7 +75,7 @@ Khách hàng có các quyền sau đối với dữ liệu cá nhân của mình
 3. Quyền yêu cầu xóa dữ liệu, trừ dữ liệu phải lưu theo quy định pháp luật về kế toán và thuế.
 4. Quyền rút lại sự đồng ý đã cung cấp trước đó.
 
-Yêu cầu được gửi về địa chỉ privacy@shop.example.vn và được xử lý trong vòng 30 ngày.
+Yêu cầu được gửi về địa chỉ privacy@northlight.example.vn và được xử lý trong vòng 30 ngày.
 
 Dữ liệu đơn hàng được lưu trữ trong 5 năm theo quy định về lưu trữ chứng từ kế toán. Nội dung hội thoại tư vấn được lưu trong 12 tháng.
 
@@ -87,6 +87,6 @@ Customers hold the following rights over their personal data:
 3. The right to request deletion, except for data that must be retained under accounting and tax law.
 4. The right to withdraw consent previously given.
 
-Requests go to privacy@shop.example.vn and are handled within 30 days.
+Requests go to privacy@northlight.example.vn and are handled within 30 days.
 
 Order data is retained for 5 years in line with accounting record retention rules. Advisory conversation content is retained for 12 months.

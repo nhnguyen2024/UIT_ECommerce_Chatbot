@@ -196,3 +196,34 @@ class TestOrders:
     def test_every_status_in_the_enum_is_exercised(self):
         produced = {order.status for order in self.orders}
         assert produced == set(OrderStatus.__args__)
+
+
+class TestCategoryConsistency:
+    """The tool's category enum and the generated catalogue must not drift.
+
+    `search_products` exposes the category list as an enum so the model cannot
+    invent one. If the catalogue is regenerated with different categories and the
+    enum is not updated, the model filters on a slug that matches nothing and the
+    search silently returns zero results, which is very hard to spot from a chat
+    window.
+    """
+
+    def test_generated_categories_match_the_declared_list(self):
+        from app.db.schema import PRODUCT_CATEGORIES
+        from seed.catalog import generate_products
+
+        generated = {product.category for product in generate_products()}
+        assert generated == set(PRODUCT_CATEGORIES)
+
+    def test_tool_enum_is_the_shared_list(self):
+        from app.agent.tools.products import CATEGORIES
+        from app.db.schema import PRODUCT_CATEGORIES
+
+        assert CATEGORIES == PRODUCT_CATEGORIES
+
+    def test_every_template_slug_is_declared(self):
+        from app.db.schema import PRODUCT_CATEGORIES
+        from seed.catalog import TEMPLATES
+
+        for template in TEMPLATES:
+            assert template.slug in PRODUCT_CATEGORIES

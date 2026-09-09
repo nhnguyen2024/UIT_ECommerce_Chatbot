@@ -3,7 +3,7 @@ doc_id: shipping-policy
 policy_type: shipping
 title_vi: Chính sách vận chuyển và giao hàng
 title_en: Shipping and Delivery Policy
-source_url: https://shop.example.vn/chinh-sach-van-chuyen
+source_url: https://northlight.example.vn/chinh-sach-van-chuyen
 updated_at: 2026-02-01
 ---
 
