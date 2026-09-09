@@ -188,7 +188,9 @@ async def search_products(
         limit=fetch,
         filters=filters or None,
     )
-    semantic = await collection.aggregate([semantic_stage, {"$project": _CARD_FIELDS}]).to_list(fetch)
+    semantic = await (
+        await collection.aggregate([semantic_stage, {"$project": _CARD_FIELDS}])
+    ).to_list(fetch)
 
     # Keyword half. `$search` filters differently from `$vectorSearch`, so the
     # same constraints are applied afterwards with a plain `$match`.
@@ -201,7 +203,7 @@ async def search_products(
     if filters:
         keyword_pipeline.append({"$match": filters})
     keyword_pipeline.append({"$project": _CARD_FIELDS})
-    keyword = await collection.aggregate(keyword_pipeline).to_list(fetch)
+    keyword = await (await collection.aggregate(keyword_pipeline)).to_list(fetch)
 
     # Semantic results are weighted higher: shoppers describe needs ("something
     # warm for winter") far more often than they type exact model names.

@@ -90,8 +90,8 @@ async def search_policies(
         limit=limit,
         filters=filters,
     )
-    documents = await get_db()[schema.POLICIES].aggregate(
-        [stage, {"$project": _CHUNK_FIELDS}]
+    documents = await (
+        await get_db()[schema.POLICIES].aggregate([stage, {"$project": _CHUNK_FIELDS}])
     ).to_list(limit)
 
     suffix = "vi" if context.lang == "vi" else "en"

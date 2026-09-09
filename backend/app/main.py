@@ -5,8 +5,10 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pymongo.errors import PyMongoError
 
 from app.api import admin, chat, health
 from app.config import get_settings
@@ -62,6 +64,27 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(PyMongoError)
+async def handle_database_error(request: Request, exc: PyMongoError) -> JSONResponse:
+    """Report a datastore outage as 503 rather than 500.
+
+    Registered once here instead of wrapped around each endpoint. A 500 tells a
+    client the service is broken and there is no point retrying; a 503 says the
+    service is fine and its datastore is not, which is both true and actionable.
+    The distinction also keeps the dashboard's error state honest: it can say the
+    database is unreachable rather than blaming itself.
+
+    The exception detail is logged but never returned. A PyMongo error message
+    carries the connection string's host and topology, which should not reach a
+    browser.
+    """
+    logger.warning("database error on %s %s", request.method, request.url.path, exc_info=exc)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "The database is unavailable. Please try again shortly."},
+    )
+
 
 app.include_router(health.router)
 app.include_router(chat.router)

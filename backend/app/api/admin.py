@@ -63,7 +63,7 @@ async def summary(days: int = Query(7, ge=1, le=90)) -> dict:
             }
         },
     ]
-    rows = await get_db()[schema.EVENTS].aggregate(pipeline).to_list(1)
+    rows = await (await get_db()[schema.EVENTS].aggregate(pipeline)).to_list(1)
     if not rows:
         return {
             "days": days,
@@ -118,7 +118,7 @@ async def intents(days: int = Query(7, ge=1, le=90)) -> list[dict]:
         },
         {"$sort": {"turns": -1}},
     ]
-    return await get_db()[schema.EVENTS].aggregate(pipeline).to_list(20)
+    return await (await get_db()[schema.EVENTS].aggregate(pipeline)).to_list(20)
 
 
 @router.get("/timeseries")
@@ -147,7 +147,7 @@ async def timeseries(days: int = Query(14, ge=1, le=90)) -> list[dict]:
         },
         {"$sort": {"date": 1}},
     ]
-    return await get_db()[schema.EVENTS].aggregate(pipeline).to_list(90)
+    return await (await get_db()[schema.EVENTS].aggregate(pipeline)).to_list(90)
 
 
 @router.get("/tools")
@@ -160,7 +160,7 @@ async def tool_usage(days: int = Query(7, ge=1, le=90)) -> list[dict]:
         {"$project": {"_id": 0, "tool": "$_id", "calls": 1}},
         {"$sort": {"calls": -1}},
     ]
-    return await get_db()[schema.EVENTS].aggregate(pipeline).to_list(20)
+    return await (await get_db()[schema.EVENTS].aggregate(pipeline)).to_list(20)
 
 
 @router.get("/handoffs")
