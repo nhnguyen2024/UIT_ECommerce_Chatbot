@@ -1,0 +1,78 @@
+:host { display: block; min-height: 100vh; }
+
+/* The aurora band. Three overlapping radial washes rather than a linear
+   gradient, so the colours pool unevenly the way real aurora does. Fixed and
+   non-interactive: it sits behind content and never intercepts a click. */
+.aurora {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 380px;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(60% 130% at 12% 0%, color-mix(in oklab, var(--aurora-a) 26%, transparent), transparent 70%),
+    radial-gradient(50% 120% at 48% 0%, color-mix(in oklab, var(--aurora-b) 20%, transparent), transparent 72%),
+    radial-gradient(55% 125% at 85% 0%, color-mix(in oklab, var(--aurora-c) 22%, transparent), transparent 70%);
+  filter: blur(6px);
+  opacity: 0.9;
+  mask-image: linear-gradient(to bottom, #000 0%, #000 35%, transparent 100%);
+}
+
+:root[data-theme='light'] .aurora { opacity: 0.5; }
+
+.topbar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 16px clamp(16px, 4vw, 34px);
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in oklab, var(--ground) 72%, transparent);
+  backdrop-filter: blur(14px);
+  position: sticky;
+  top: 0;
+}
+
+.brand { display: flex; align-items: center; gap: 11px; text-decoration: none; color: var(--ink); }
+
+/* A compass needle rather than a letter: it says "north" without spelling it. */
+.glyph {
+  width: 20px; height: 20px; flex: none;
+  background: linear-gradient(150deg, var(--aurora-a), var(--aurora-b) 45%, var(--aurora-c));
+  clip-path: polygon(50% 0%, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0% 50%, 38% 38%);
+}
+
+.wordmark { font-family: var(--font-display); font-weight: 600; font-size: 16px; letter-spacing: -0.01em; }
+
+.nav { display: flex; gap: 4px; margin-left: auto; }
+.nav a {
+  padding: 7px 14px;
+  border-radius: 99px;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+  transition: background 0.15s, color 0.15s;
+}
+.nav a:hover { background: var(--surface-2); color: var(--ink); }
+.nav a.on { background: var(--accent-wash); color: var(--accent); }
+
+.theme {
+  padding: 7px 13px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.theme:hover { border-color: var(--border-strong); color: var(--ink); }
+
+@media (max-width: 560px) {
+  .topbar { gap: 12px; padding: 12px 14px; }
+  .wordmark { display: none; }
+  .nav a { padding: 6px 11px; font-size: 12px; }
+}

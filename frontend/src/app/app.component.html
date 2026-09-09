@@ -1,0 +1,26 @@
+<!-- The aurora: a single decorative band across the top of every page. It is
+     the brand mark, so it belongs in the shell rather than being repeated. -->
+<div class="aurora" aria-hidden="true"></div>
+
+<header class="topbar">
+  <a class="brand" routerLink="/">
+    <span class="glyph" aria-hidden="true"></span>
+    <span class="wordmark">Northlight</span>
+  </a>
+
+  <nav class="nav">
+    <a routerLink="/" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: true }">Support</a>
+    <a routerLink="/admin" routerLinkActive="on">Operations</a>
+  </nav>
+
+  <button
+    type="button"
+    class="theme"
+    (click)="toggleTheme()"
+    [attr.aria-label]="theme() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
+  >
+    {{ theme() === 'dark' ? 'Light' : 'Dark' }}
+  </button>
+</header>
+
+<router-outlet />

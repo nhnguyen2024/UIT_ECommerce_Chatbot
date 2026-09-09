@@ -8,23 +8,53 @@ export interface Citation {
 
 export interface Product {
   sku: string;
+  /** Already localised by the backend to the conversation's language. */
+  name?: string;
   name_vi?: string;
   name_en?: string;
   brand?: string;
+  category_label?: string;
   price?: number;
   sale_price?: number | null;
   rating?: number;
+  review_count?: number;
   stock?: number;
+  in_stock?: boolean;
+  image?: string | null;
 }
 
+/**
+ * One frame from the chat stream.
+ *
+ * The backend emits `tool_start` and `tool_end` specifically so the interface
+ * can show which lookup is running. Ignoring them is what makes a turn look
+ * like a blank pause while the agent is in fact working.
+ */
 export interface StreamEvent {
-  type: string;
+  type:
+    | 'session'
+    | 'start'
+    | 'text'
+    | 'tool_start'
+    | 'tool_end'
+    | 'products'
+    | 'citations'
+    | 'done'
+    | 'error';
   delta?: string;
   text?: string;
   session_id?: string;
   citations?: Citation[];
   items?: unknown[];
   message?: string;
+  /** `start` only: the language the reply will be written in. */
+  lang?: 'vi' | 'en';
+  /** `start` only: what the classifier decided the shopper wants. */
+  intent?: string;
+  /** `tool_start` and `tool_end`: which tool. */
+  name?: string;
+  /** `tool_end` only: whether the lookup succeeded. */
+  ok?: boolean;
 }
 
 export interface StoredConversation {

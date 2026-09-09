@@ -1,14 +1,46 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ChatService, Citation, Product, StreamEvent } from './chat.service';
+
+/** A tool call, as the shopper sees it. */
+interface ToolStep {
+  name: string;
+  label: string;
+  done: boolean;
+  ok: boolean;
+}
 
 interface Message {
   role: 'user' | 'assistant';
   text: string;
   citations?: Citation[];
   products?: Product[];
+  tools?: ToolStep[];
   pending?: boolean;
 }
+
+/**
+ * Human-readable labels for the tools, in both languages.
+ *
+ * The raw tool name is an implementation detail. "search_policies" means
+ * nothing to a shopper; "Reading store policies" tells them why they are
+ * waiting, which is the entire point of showing progress at all.
+ */
+const TOOL_LABELS: Record<string, { vi: string; en: string }> = {
+  search_products: { vi: 'Đang tìm sản phẩm', en: 'Searching products' },
+  get_product_details: { vi: 'Đang xem chi tiết sản phẩm', en: 'Reading product details' },
+  compare_products: { vi: 'Đang so sánh sản phẩm', en: 'Comparing products' },
+  search_policies: { vi: 'Đang tra cứu chính sách', en: 'Reading store policies' },
+  get_order_status: { vi: 'Đang kiểm tra đơn hàng', en: 'Checking your order' },
+  create_handoff: { vi: 'Đang chuyển cho nhân viên', en: 'Connecting you to an agent' },
+};
+
+const SUGGESTIONS = [
+  { vi: 'Tai nghe chống ồn dưới 2 triệu?', en: 'Noise cancelling headphones under 2 million?' },
+  { vi: 'Chính sách đổi trả trong bao lâu?', en: 'How long is the return window?' },
+  { vi: 'Đơn DH2026090001, sđt 0901234567', en: 'Order DH2026090001, phone 0901234567' },
+  { vi: 'Laptop cho sinh viên IT tầm 20 triệu', en: 'A laptop for a CS student, around 20 million' },
+];
 
 @Component({
   selector: 'app-chat',
@@ -20,37 +52,47 @@ interface Message {
 })
 export class ChatComponent {
   private readonly chat = inject(ChatService);
+
   readonly sessionId = signal<string | null>(localStorage.getItem('northlight-session'));
-  readonly messages = signal<Message[]>([
-    {
-      role: 'assistant',
-      text: 'Xin chào. Mình có thể tư vấn sản phẩm, giải đáp chính sách hoặc tra cứu đơn hàng giúp bạn. / I can help you compare products, understand our policies, or check an order.',
-    },
-  ]);
+  readonly messages = signal<Message[]>([]);
   readonly busy = signal(false);
   readonly error = signal('');
+  readonly lang = signal<'vi' | 'en'>('vi');
   draft = '';
 
+  /** Starter prompts only make sense before the conversation begins. */
+  readonly showSuggestions = computed(() => this.messages().length === 0);
+  readonly suggestions = SUGGESTIONS;
+
   constructor() {
-    const savedSession = this.sessionId();
-    if (savedSession) {
-      this.chat.getConversation(savedSession).subscribe({
+    const saved = this.sessionId();
+    if (saved) {
+      this.chat.getConversation(saved).subscribe({
         next: (conversation) => {
           if (conversation.messages.length) {
-            this.messages.set(conversation.messages.map((message) => ({
-              role: message.role,
-              text: message.text,
-              citations: message.citations,
-              products: message.products,
-            })));
+            this.messages.set(
+              conversation.messages.map((message) => ({
+                role: message.role,
+                text: message.text,
+                citations: message.citations,
+                products: message.products,
+              })),
+            );
           }
         },
         error: () => {
+          // The session is gone, or the datastore is unreachable. Either way,
+          // start clean rather than showing an error for an empty screen.
           localStorage.removeItem('northlight-session');
           this.sessionId.set(null);
         },
       });
     }
+  }
+
+  ask(text: string): void {
+    this.draft = text;
+    this.send();
   }
 
   send(): void {
@@ -63,15 +105,15 @@ export class ChatComponent {
     this.messages.update((items) => [
       ...items,
       { role: 'user', text: message },
-      { role: 'assistant', text: '', pending: true },
+      { role: 'assistant', text: '', pending: true, tools: [] },
     ]);
 
     this.chat.stream(message, this.sessionId()).subscribe({
       next: (event) => this.handleEvent(event),
       error: () => {
         this.busy.set(false);
-        this.error.set('The assistant is unavailable right now. Please try again.');
-        this.removePending();
+        this.error.set('The assistant is unreachable right now. Please try again.');
+        this.messages.update((items) => items.filter((item) => !item.pending));
       },
       complete: () => this.busy.set(false),
     });
@@ -87,49 +129,129 @@ export class ChatComponent {
   reset(): void {
     localStorage.removeItem('northlight-session');
     this.sessionId.set(null);
-    this.messages.set([{ role: 'assistant', text: 'Cuộc trò chuyện mới. Bạn đang tìm sản phẩm gì? / A fresh conversation. What are you looking for?' }]);
+    this.messages.set([]);
     this.error.set('');
   }
 
   private handleEvent(event: StreamEvent): void {
-    if (event.type === 'session' && event.session_id) {
-      this.sessionId.set(event.session_id);
-      localStorage.setItem('northlight-session', event.session_id);
-    }
-    if (event.type === 'text' && event.delta) {
-      this.messages.update((items) => this.updateLast(items, (last) => ({
-        ...last,
-        text: last.text + event.delta,
-      })));
-    }
-    if (event.type === 'products' && event.items) {
-      this.messages.update((items) => this.updateLast(items, (last) => ({
-        ...last,
-        products: event.items as Product[],
-      })));
-    }
-    if (event.type === 'citations' && event.items) {
-      this.messages.update((items) => this.updateLast(items, (last) => ({
-        ...last,
-        citations: event.items as Citation[],
-      })));
-    }
-    if (event.type === 'error') this.error.set(event.message ?? 'The assistant could not complete that request.');
-    if (event.type === 'done') {
-      this.messages.update((items) => this.updateLast(items, (last) => ({ ...last, text: event.text ?? last.text, pending: false })));
+    switch (event.type) {
+      case 'session':
+        if (event.session_id) {
+          this.sessionId.set(event.session_id);
+          localStorage.setItem('northlight-session', event.session_id);
+        }
+        break;
+
+      case 'start':
+        if (event.lang) this.lang.set(event.lang);
+        break;
+
+      case 'text':
+        if (event.delta) {
+          this.patchLast((last) => ({ ...last, text: last.text + event.delta }));
+        }
+        break;
+
+      case 'tool_start':
+        if (event.name) {
+          const name = event.name;
+          this.patchLast((last) => ({
+            ...last,
+            tools: [...(last.tools ?? []), { name, label: this.toolLabel(name), done: false, ok: true }],
+          }));
+        }
+        break;
+
+      case 'tool_end':
+        if (event.name) {
+          const name = event.name;
+          const ok = event.ok !== false;
+          this.patchLast((last) => ({
+            ...last,
+            // Mark the first still-running step with this name. A turn can call
+            // the same tool twice, and completing the wrong one would leave a
+            // spinner running forever.
+            tools: markFirstPending(last.tools ?? [], name, ok),
+          }));
+        }
+        break;
+
+      case 'products':
+        this.patchLast((last) => ({ ...last, products: event.items as Product[] }));
+        break;
+
+      case 'citations':
+        this.patchLast((last) => ({ ...last, citations: event.items as Citation[] }));
+        break;
+
+      case 'error':
+        this.error.set(event.message ?? 'The assistant could not complete that request.');
+        break;
+
+      case 'done':
+        this.patchLast((last) => ({
+          ...last,
+          text: event.text ?? last.text,
+          pending: false,
+          // Any tool still marked running never reported an end frame; the turn
+          // is over, so stop showing it as in progress.
+          tools: (last.tools ?? []).map((step) => ({ ...step, done: true })),
+        }));
+        break;
     }
   }
 
-  private updateLast(items: Message[], update: (last: Message) => Message): Message[] {
-    if (!items.length) return items;
-    return [...items.slice(0, -1), update(items[items.length - 1])];
+  private patchLast(update: (last: Message) => Message): void {
+    this.messages.update((items) =>
+      items.length ? [...items.slice(0, -1), update(items[items.length - 1])] : items,
+    );
   }
 
-  private removePending(): void {
-    this.messages.update((items) => items.filter((item) => !item.pending));
+  private toolLabel(name: string): string {
+    const entry = TOOL_LABELS[name];
+    if (!entry) return name.replace(/_/g, ' ');
+    return this.lang() === 'vi' ? entry.vi : entry.en;
   }
 
-  formatPrice(value: number | undefined): string {
-    return value === undefined ? '' : new Intl.NumberFormat('vi-VN').format(value) + ' VND';
+  /** Which tools ran, for the collapsed trace under a finished reply. */
+  toolSummary(tools: ToolStep[] | undefined): string {
+    if (!tools?.length) return '';
+    return [...new Set(tools.map((step) => step.name.replace(/_/g, ' ')))].join(' · ');
   }
+
+  citationLabel(citation: Citation): string {
+    const id = citation.source_id;
+    if (citation.kind === 'policy') {
+      const [doc, section] = id.split('#');
+      return `${doc.replace(/-/g, ' ')} → ${(section ?? '').replace(/-/g, ' ')}`;
+    }
+    return id.replace(/^(product|order|ticket):/, '');
+  }
+
+  price(value: number | null | undefined): string {
+    return value == null ? '' : new Intl.NumberFormat('vi-VN').format(value) + 'đ';
+  }
+
+  productName(product: Product): string {
+    return product.name ?? product.name_vi ?? product.name_en ?? product.sku;
+  }
+
+  inStock(product: Product): boolean {
+    return product.in_stock ?? (product.stock ?? 0) > 0;
+  }
+}
+
+/**
+ * Complete the earliest step matching `name` that is still running.
+ *
+ * Kept as a free function so the "same tool called twice" case is easy to see
+ * and to test: completing every match at once would clear a second call that
+ * has not finished.
+ */
+function markFirstPending(tools: ToolStep[], name: string, ok: boolean): ToolStep[] {
+  const index = tools.findIndex((step) => step.name === name && !step.done);
+  if (index === -1) return tools;
+  const next = [...tools];
+  next[index] = { ...next[index], done: true, ok };
+  return next;
 }

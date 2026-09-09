@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { AdminService, Dashboard, IntentRow, TimeseriesRow } from './admin.service';
 
-/** A bar ready to render, with its geometry already resolved. */
+/** A bar with its geometry already resolved. */
 interface Bar {
   label: string;
   value: number;
@@ -15,10 +15,11 @@ interface Point {
   y: number;
   date: string;
   turns: number;
+  cost: number;
 }
 
 const CHART_WIDTH = 720;
-const CHART_HEIGHT = 160;
+const CHART_HEIGHT = 150;
 
 @Component({
   selector: 'app-admin',
@@ -35,6 +36,12 @@ export class AdminComponent {
   readonly loading = signal(true);
   readonly error = signal('');
 
+  /** Index of the hovered point on the volume chart, or null. */
+  readonly hovered = signal<number | null>(null);
+
+  readonly chartWidth = CHART_WIDTH;
+  readonly chartHeight = CHART_HEIGHT;
+
   constructor() {
     this.refresh();
   }
@@ -47,8 +54,12 @@ export class AdminComponent {
         this.data.set(dashboard);
         this.loading.set(false);
       },
-      error: () => {
-        this.error.set('Could not load dashboard data. Is the backend running and seeded?');
+      error: (response: { status?: number }) => {
+        this.error.set(
+          response?.status === 503
+            ? 'The database is unreachable. Check MONGODB_URI and your Atlas network access list.'
+            : 'Could not load dashboard data. Is the backend running?',
+        );
         this.loading.set(false);
       },
     });
@@ -57,10 +68,11 @@ export class AdminComponent {
   setRange(days: number): void {
     if (days === this.days()) return;
     this.days.set(days);
+    this.hovered.set(null);
     this.refresh();
   }
 
-  /** True when the window contains no turns, which is a different state from an error. */
+  /** No turns in the window is an empty state, not an error. */
   readonly isEmpty = computed(() => (this.data()?.summary.turns ?? 0) === 0);
 
   readonly intentBars = computed<Bar[]>(() => {
@@ -70,7 +82,7 @@ export class AdminComponent {
       label: row.intent.replace(/_/g, ' '),
       value: row.turns,
       width: (row.turns / max) * 100,
-      caption: `${row.turns} turns · ${row.avg_latency_ms} ms avg`,
+      caption: `${row.turns} · ${row.avg_latency_ms} ms`,
     }));
   });
 
@@ -90,8 +102,8 @@ export class AdminComponent {
     if (!rows.length) return [];
 
     const max = Math.max(...rows.map((row) => row.turns), 1);
-    // A single day has no horizontal span to divide across, so it is pinned to
-    // the left edge rather than dividing by zero.
+    // One day has no horizontal span to divide across, so it pins to the left
+    // edge rather than dividing by zero.
     const step = rows.length > 1 ? CHART_WIDTH / (rows.length - 1) : 0;
 
     return rows.map((row: TimeseriesRow, index) => ({
@@ -99,17 +111,18 @@ export class AdminComponent {
       y: CHART_HEIGHT - (row.turns / max) * CHART_HEIGHT,
       date: row.date,
       turns: row.turns,
+      cost: row.cost_usd,
     }));
   });
 
-  /** The volume line as an SVG path. */
   readonly linePath = computed(() => {
     const points = this.points();
     if (points.length < 2) return '';
-    return points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    return points
+      .map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+      .join(' ');
   });
 
-  /** The same line closed along the baseline, so it can be filled. */
   readonly areaPath = computed(() => {
     const points = this.points();
     if (points.length < 2) return '';
@@ -117,15 +130,47 @@ export class AdminComponent {
     return `${this.linePath()} L${last.x.toFixed(1)},${CHART_HEIGHT} L0,${CHART_HEIGHT} Z`;
   });
 
-  readonly chartWidth = CHART_WIDTH;
-  readonly chartHeight = CHART_HEIGHT;
+  readonly hoveredPoint = computed(() => {
+    const index = this.hovered();
+    return index == null ? null : (this.points()[index] ?? null);
+  });
 
   /**
-   * Share of turns that produced a grounded answer.
+   * Track the nearest point to the cursor.
    *
-   * The backend reports the count of ungrounded turns rather than a rate,
-   * because a rate cannot be summed across time buckets.
+   * The hit area is the whole chart rather than each marker, because an 8px
+   * circle is a hard target and a reader expects the tooltip to follow their
+   * cursor along the line.
    */
+  onChartMove(event: MouseEvent, element: HTMLElement): void {
+    const points = this.points();
+    if (!points.length) return;
+
+    const bounds = element.getBoundingClientRect();
+    if (!bounds.width) return;
+
+    const ratio = (event.clientX - bounds.left) / bounds.width;
+    const index = Math.round(ratio * (points.length - 1));
+    this.hovered.set(Math.min(Math.max(index, 0), points.length - 1));
+  }
+
+  clearHover(): void {
+    this.hovered.set(null);
+  }
+
+  /**
+   * Percent of the chart width, for positioning the tooltip in CSS.
+   *
+   * Clamped away from both edges: the tooltip is centred on the point, so at
+   * the first and last day half of it would hang outside the panel. Losing a
+   * few pixels of alignment is a better trade than a clipped tooltip.
+   */
+  hoverLeft(): number {
+    const point = this.hoveredPoint();
+    if (!point) return 0;
+    return Math.min(Math.max((point.x / CHART_WIDTH) * 100, 7), 93);
+  }
+
   readonly groundedRate = computed(() => {
     const summary = this.data()?.summary;
     if (!summary?.turns) return 1;
@@ -137,6 +182,9 @@ export class AdminComponent {
     if (!summary?.turns) return 0;
     return summary.escalations / summary.turns;
   });
+
+  /** Cache health is the metric most likely to regress without any symptom. */
+  readonly cacheHealthy = computed(() => (this.data()?.summary.cache_hit_rate ?? 0) >= 0.4);
 
   percent(value: number): string {
     return `${(value * 100).toFixed(1)}%`;

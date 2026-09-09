@@ -1,49 +1,127 @@
-<main class="shell">
-  <aside class="rail">
-    <div class="mark">N</div>
-    <div class="rail-copy">
-      <span class="eyebrow">NORTHLIGHT / 01</span>
-      <h1>Support, with<br /><em>some thought.</em></h1>
-      <p>Phones, laptops, audio, and home tech. Advice, policies, and order help in one conversation.</p>
-    </div>
-    <div class="rail-footer"><span class="status-dot"></span> Live support desk</div>
-  </aside>
-
-  <section class="workspace">
-    <header class="topbar">
-      <div><span class="eyebrow">CUSTOMER CARE</span><strong>Conversation room</strong></div>
-      <button class="new-chat" type="button" (click)="reset()">New conversation <span>+</span></button>
-    </header>
-
-    <div class="conversation" aria-live="polite">
+<main class="page">
+  @if (showSuggestions()) {
+    <section class="opening">
+      <h1>How can we help?</h1>
+      <p class="lede">
+        Ask about a product, our policies, or an order. Northlight stocks phones,
+        laptops, audio, wearables, TVs, and home tech.
+      </p>
+      <div class="suggestions">
+        @for (item of suggestions; track item.en) {
+          <button type="button" class="suggestion" (click)="ask(item.vi)">
+            <span class="vi">{{ item.vi }}</span>
+            <span class="en">{{ item.en }}</span>
+          </button>
+        }
+      </div>
+    </section>
+  } @else {
+    <div class="thread" aria-live="polite">
       @for (message of messages(); track $index) {
-        <article class="message" [class.from-user]="message.role === 'user'">
-          <div class="message-meta">{{ message.role === 'user' ? 'YOU' : 'NORTHLIGHT' }} <span>{{ message.role === 'assistant' && message.pending ? 'THINKING' : '' }}</span></div>
-          <p class="message-text">{{ message.text }}<span class="cursor" [class.visible]="message.pending"></span></p>
+        <article class="turn" [class.mine]="message.role === 'user'">
+          @if (message.role === 'assistant') {
+            <div class="who">
+              <span class="dot" aria-hidden="true"></span>Northlight
+            </div>
+
+            <!-- Tool progress. The backend streams these so the shopper can see
+                 the lookup happening rather than watching an empty pause. -->
+            @if (message.tools?.length) {
+              <ul class="steps">
+                @for (step of message.tools; track $index) {
+                  <li [class.done]="step.done" [class.failed]="!step.ok">
+                    <span class="tick" aria-hidden="true"></span>
+                    {{ step.label }}
+                  </li>
+                }
+              </ul>
+            }
+          }
+
+          @if (message.text) {
+            <p class="body">{{ message.text }}<span class="caret" [class.on]="message.pending"></span></p>
+          } @else if (message.pending && !message.tools?.length) {
+            <p class="body"><span class="caret on"></span></p>
+          }
+
           @if (message.products?.length) {
-            <div class="product-grid">
+            <div class="cards">
               @for (product of message.products; track product.sku) {
-                <div class="product-card">
-                  <div class="product-image">{{ product.brand?.slice(0, 1) ?? 'P' }}</div>
-                  <div><small>{{ product.brand ?? product.sku }}</small><strong>{{ product.name_en ?? product.name_vi ?? product.sku }}</strong><span>{{ formatPrice(product.sale_price ?? product.price) }}</span></div>
-                </div>
+                <article class="card">
+                  <div class="thumb" aria-hidden="true">{{ (product.brand ?? product.sku).slice(0, 2) }}</div>
+                  <div class="detail">
+                    <span class="brand">{{ product.brand ?? product.category_label }}</span>
+                    <strong class="name">{{ productName(product) }}</strong>
+                    <div class="pricing">
+                      @if (product.sale_price != null) {
+                        <span class="now">{{ price(product.sale_price) }}</span>
+                        <s class="was">{{ price(product.price) }}</s>
+                      } @else {
+                        <span class="now">{{ price(product.price) }}</span>
+                      }
+                    </div>
+                    <div class="meta">
+                      @if (product.rating != null) {
+                        <span class="rating">★ {{ product.rating }}</span>
+                      }
+                      <span class="stock" [class.out]="!inStock(product)">
+                        {{ inStock(product) ? 'In stock' : 'Out of stock' }}
+                      </span>
+                    </div>
+                  </div>
+                </article>
               }
             </div>
           }
+
           @if (message.citations?.length) {
-            <div class="citations">Sources: @for (citation of message.citations; track citation.source_id) { <span>{{ citation.source_id }}</span> }</div>
+            <div class="sources">
+              <span class="eyebrow">Sources</span>
+              <div class="chips">
+                @for (citation of message.citations; track citation.source_id) {
+                  <span class="chip" [attr.data-kind]="citation.kind" [title]="citation.source_id">
+                    {{ citationLabel(citation) }}
+                  </span>
+                }
+              </div>
+            </div>
+          }
+
+          @if (message.role === 'assistant' && !message.pending && message.tools?.length) {
+            <div class="trace">{{ toolSummary(message.tools) }}</div>
           }
         </article>
       }
-      @if (error()) { <div class="error">{{ error() }}</div> }
-    </div>
 
-    <footer class="composer-wrap">
-      <div class="composer">
-        <textarea [(ngModel)]="draft" (keydown)="handleKeydown($event)" [disabled]="busy()" rows="1" placeholder="Ask about a product, policy, or order..."></textarea>
-        <button class="send" type="button" (click)="send()" [disabled]="busy() || !draft.trim()" aria-label="Send message">&#8599;</button>
-      </div>
-      <span>Enter to send · Your conversation stays private</span>
-    </footer>
-  </section>
+      @if (error()) {
+        <p class="alert" role="alert">{{ error() }}</p>
+      }
+    </div>
+  }
+
+  <footer class="composer-wrap">
+    <div class="composer">
+      <textarea
+        [(ngModel)]="draft"
+        (keydown)="handleKeydown($event)"
+        [disabled]="busy()"
+        rows="1"
+        aria-label="Message"
+        placeholder="Ask about a product, a policy, or an order…"
+      ></textarea>
+      <button
+        type="button"
+        class="send"
+        (click)="send()"
+        [disabled]="busy() || !draft.trim()"
+        aria-label="Send message"
+      >↑</button>
+    </div>
+    <div class="composer-meta">
+      <span>Enter to send · Shift+Enter for a new line</span>
+      @if (messages().length) {
+        <button type="button" class="restart" (click)="reset()">New conversation</button>
+      }
+    </div>
+  </footer>
 </main>
