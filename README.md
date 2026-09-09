@@ -221,6 +221,13 @@ Apple Silicon and pushing produces an image that fails with `exec format error`.
 
 See [docs/setup.md](docs/setup.md) for the full walkthrough and troubleshooting.
 
+## Documentation
+
+| Document | Contents |
+|---|---|
+| [docs/setup.md](docs/setup.md) | From an empty machine to a working chatbot, with troubleshooting |
+| [docs/architecture.md](docs/architecture.md) | Design record: the life of a turn, retrieval design, the order-lookup threat model, evaluation methodology, and known limitations |
+
 ## Data
 
 All data is **synthetic**. Product names, customers, and orders are generated; the policy documents are written for this project and describe a fictional store. Nothing here comes from a real e-commerce platform.
