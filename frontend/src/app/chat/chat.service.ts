@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import type { Tracking } from './order-map.component';
+import { apiUrl } from '../api';
 
 export interface Citation {
   source_id: string;
@@ -78,7 +79,7 @@ export class ChatService {
 
   getConversation(sessionId: string): Observable<StoredConversation> {
     return new Observable<StoredConversation>((subscriber) => {
-      fetch(`/api/chat/${encodeURIComponent(sessionId)}`)
+      fetch(apiUrl(`/api/chat/${encodeURIComponent(sessionId)}`))
         .then(async (response) => {
           if (!response.ok) throw new Error(`Conversation load failed (${response.status})`);
           subscriber.next(await response.json() as StoredConversation);
@@ -92,7 +93,7 @@ export class ChatService {
     return new Observable<StreamEvent>((subscriber) => {
       const controller = new AbortController();
 
-      fetch(this.endpoint, {
+      fetch(apiUrl(this.endpoint), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
         body: JSON.stringify({ message, session_id: sessionId }),

@@ -28,30 +28,6 @@ if [[ -z "${BACKEND_URL:-}" ]]; then
   exit 1
 fi
 
-# The SPA calls same-origin /api/* paths. In development the Angular dev server
-# proxies those to localhost; in production Static Web Apps rewrites them to the
-# Container App. Writing the rule here keeps the frontend free of any hardcoded
-# backend hostname, so the same bundle works in both places.
-cat > "$FRONTEND_DIR/staticwebapp.config.json" <<CONFIG
-{
-  "routes": [
-    {
-      "route": "/api/*",
-      "rewrite": "$BACKEND_URL/api/*"
-    }
-  ],
-  "navigationFallback": {
-    "rewrite": "/index.html",
-    "exclude": ["/api/*", "*.{css,js,ico,png,jpg,svg,woff2}"]
-  },
-  "globalHeaders": {
-    "X-Content-Type-Options": "nosniff",
-    "X-Frame-Options": "DENY",
-    "Referrer-Policy": "strict-origin-when-cross-origin"
-  }
-}
-CONFIG
-
 echo "==> Building Angular bundle"
 ( cd "$FRONTEND_DIR" && npm ci && npx ng build --configuration production )
 
@@ -63,6 +39,36 @@ if [[ ! -d "$OUTPUT_DIR" ]]; then
   echo "Check the outputPath in angular.json and adjust this script." >&2
   exit 1
 fi
+
+# The browser calls the backend directly. Static Web Apps cannot proxy /api to
+# an external URL: rewrite targets must be paths inside the app, and linking a
+# Container App as the managed API needs the paid Standard plan. So the bundle
+# reads the backend's address from config.js at runtime, written here, and the
+# backend allows this site's origin through CORS (see the summary below).
+cat > "$OUTPUT_DIR/config.js" <<CONFIG
+window.NORTHLIGHT_API_BASE = '${BACKEND_URL%/}';
+CONFIG
+
+# Written into the uploaded folder, which is where Static Web Apps reads it.
+cat > "$OUTPUT_DIR/staticwebapp.config.json" <<'CONFIG'
+{
+  "routes": [
+    {
+      "route": "/config.js",
+      "headers": { "Cache-Control": "no-cache" }
+    }
+  ],
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["*.{css,js,ico,png,jpg,svg,woff2,json}"]
+  },
+  "globalHeaders": {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin"
+  }
+}
+CONFIG
 
 echo "==> Static Web App"
 az staticwebapp create \

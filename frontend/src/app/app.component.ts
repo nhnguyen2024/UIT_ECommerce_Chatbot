@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { CartService } from './shop/cart.service';
 import { ThemeService } from './theme.service';
 
 /** Application shell: the aurora band, navigation, and the routed page. */
@@ -14,6 +15,7 @@ import { ThemeService } from './theme.service';
 export class AppComponent {
   private readonly themes = inject(ThemeService);
   readonly theme = this.themes.theme;
+  readonly cart = inject(CartService);
 
   toggleTheme(): void {
     this.themes.toggle();

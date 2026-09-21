@@ -1,0 +1,94 @@
+<main class="page">
+  <section class="hero">
+    <span class="eyebrow">Northlight store</span>
+    <h1>Electronics, sold here and on the marketplaces you already use.</h1>
+    <p>
+      Every product below is on Northlight.vn, and most are also listed on Shopee, Lazada or TikTok Shop.
+      Wherever you bought it, one assistant answers for your order.
+    </p>
+  </section>
+
+  <div class="toolbar">
+    <form class="search" (submit)="$event.preventDefault(); search()">
+      <input type="search" name="q" [(ngModel)]="query" placeholder="Search by name or brand" aria-label="Search products" />
+      <button type="submit">Search</button>
+    </form>
+    <label class="sort">
+      <span>Sort</span>
+      <select name="sort" [(ngModel)]="sort" (ngModelChange)="search()">
+        @for (option of sorts; track option.value) {
+          <option [value]="option.value">{{ option.label }}</option>
+        }
+      </select>
+    </label>
+  </div>
+
+  <nav class="categories" aria-label="Categories">
+    <button type="button" [class.on]="category() === null" (click)="pick(null)">All</button>
+    @for (entry of categories(); track entry.slug) {
+      <button type="button" [class.on]="category() === entry.slug" (click)="pick(entry.slug)">
+        {{ entry.label_en }} <span class="count">{{ entry.count }}</span>
+      </button>
+    }
+  </nav>
+
+  @if (error()) {
+    <p class="alert" role="alert">{{ error() }}</p>
+  }
+
+  <p class="summary">{{ total() }} products</p>
+
+  <div class="grid">
+    @for (product of products(); track product.sku) {
+      <article class="tile" [class.sold-out]="!product.in_stock">
+        <a class="tile-link" [routerLink]="['/shop', product.sku]">
+          <div class="art">
+            @if (discount(product); as off) {
+              <span class="off">-{{ off }}%</span>
+            }
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path [attr.d]="icon(product)" />
+            </svg>
+          </div>
+          <span class="brand">{{ product.brand }}</span>
+          <strong class="name">{{ product.name_vi }}</strong>
+          <div class="pricing">
+            @if (product.sale_price != null) {
+              <span class="now">{{ price(product.sale_price) }}</span>
+              <s class="was">{{ price(product.price) }}</s>
+            } @else {
+              <span class="now">{{ price(product.price) }}</span>
+            }
+          </div>
+          <div class="meta">
+            <span class="rating"><span class="star" aria-hidden="true">★</span>{{ product.rating }}
+              <span class="muted">({{ product.review_count }})</span></span>
+            @if (!product.in_stock) {
+              <span class="stock out">Out of stock</span>
+            }
+          </div>
+          @if (marketplaces(product).length) {
+            <div class="channels" [attr.aria-label]="'Also on ' + marketplaces(product).join(', ')">
+              <span class="muted">Also on</span>
+              @for (label of marketplaces(product); track label) {
+                <span class="channel">{{ label }}</span>
+              }
+            </div>
+          }
+        </a>
+        <button type="button" class="add" [disabled]="!product.in_stock" (click)="addToCart(product)">
+          {{ added() === product.sku ? 'Added ✓' : 'Add to cart' }}
+        </button>
+      </article>
+    }
+  </div>
+
+  @if (products().length < total()) {
+    <div class="more">
+      <button type="button" class="ghost" [disabled]="loading()" (click)="more()">
+        {{ loading() ? 'Loading…' : 'Show more' }}
+      </button>
+    </div>
+  }
+</main>

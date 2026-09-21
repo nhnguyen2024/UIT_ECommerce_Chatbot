@@ -1,0 +1,84 @@
+<main class="page narrow">
+  <a class="back" routerLink="/shop">← All products</a>
+
+  @if (missing()) {
+    <p class="alert" role="alert">That product does not exist.</p>
+  } @else if (product(); as product) {
+    <section class="detail">
+      <div class="art large">
+        @if (discount(product); as off) {
+          <span class="off">-{{ off }}%</span>
+        }
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.1"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path [attr.d]="icon(product)" />
+        </svg>
+      </div>
+
+      <div class="info">
+        <span class="brand">{{ product.brand }} · {{ product.category_en }}</span>
+        <h1>{{ product.name_vi }}</h1>
+        <div class="meta">
+          <span class="rating"><span class="star" aria-hidden="true">★</span>{{ product.rating }}
+            <span class="muted">({{ product.review_count }} reviews)</span></span>
+          <span class="stock" [class.out]="!product.in_stock">
+            {{ product.in_stock ? product.stock + ' in stock' : 'Out of stock' }}
+          </span>
+        </div>
+
+        <div class="pricing big">
+          @if (product.sale_price != null) {
+            <span class="now">{{ price(product.sale_price) }}</span>
+            <s class="was">{{ price(product.price) }}</s>
+          } @else {
+            <span class="now">{{ price(product.price) }}</span>
+          }
+        </div>
+
+        <div class="buy">
+          <div class="qty" aria-label="Quantity">
+            <button type="button" (click)="step(-1)" aria-label="Fewer">−</button>
+            <span>{{ quantity() }}</span>
+            <button type="button" (click)="step(1)" aria-label="More">+</button>
+          </div>
+          <button type="button" class="primary" [disabled]="!product.in_stock" (click)="addToCart()">
+            {{ added() ? 'Added to cart ✓' : 'Add to cart' }}
+          </button>
+          <button type="button" class="ghost" (click)="ask()">Ask the assistant</button>
+        </div>
+
+        <div class="where">
+          <span class="eyebrow">Where it is sold</span>
+          <ul>
+            @for (channel of channels; track channel) {
+              <li [class.yes]="listed(channel)">
+                <span class="tick" aria-hidden="true">{{ listed(channel) ? '✓' : '–' }}</span>
+                {{ label(channel) }}
+                @if (!listed(channel)) { <span class="muted">not listed</span> }
+              </li>
+            }
+          </ul>
+          <p class="muted small">
+            Bought it on a marketplace? Track the order and ask about returns or warranty with the assistant on this site.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="specs">
+      <h2>About this product</h2>
+      <p>{{ product.description_vi }}</p>
+      @if (product.attributes?.length) {
+        <table>
+          <tbody>
+            @for (attribute of product.attributes; track attribute.key) {
+              <tr><th>{{ attribute.label_vi }}</th><td>{{ attribute.value_vi }}</td></tr>
+            }
+          </tbody>
+        </table>
+      }
+    </section>
+  } @else {
+    <p class="muted">Loading…</p>
+  }
+</main>

@@ -1,0 +1,29 @@
+<main class="page narrow">
+  <section class="placed">
+    <span class="check" aria-hidden="true">✓</span>
+    <h1>Order placed</h1>
+    <p>Your order code is</p>
+    <strong class="code">{{ code() }}</strong>
+    <p class="muted">Keep it: with your phone number or email, it is how you check the order.</p>
+
+    @if (order; as order) {
+      <div class="order-summary compact">
+        <ul>
+          @for (item of order.items; track item.sku) {
+            <li><span>{{ item.quantity }} × {{ item.name_vi }}</span><span>{{ price(item.unit_price * item.quantity) }}</span></li>
+          }
+        </ul>
+        <div class="row"><span>Shipping to {{ order.province }}</span>
+          <span>{{ order.shipping_fee === 0 ? 'Free' : price(order.shipping_fee) }}</span></div>
+        <div class="row total"><span>Total</span><strong>{{ price(order.total) }}</strong></div>
+        <div class="row"><span>Payment</span>
+          <span>{{ order.payment_method === 'cod' ? 'Cash on delivery' : 'Bank transfer (demo)' }}</span></div>
+      </div>
+    }
+
+    <div class="actions">
+      <button type="button" class="primary" (click)="track()">Track it with the assistant</button>
+      <a class="ghost link" routerLink="/shop">Continue shopping</a>
+    </div>
+  </section>
+</main>

@@ -1,0 +1,41 @@
+<main class="page narrow">
+  <h1 class="title">Your cart</h1>
+
+  @if (!cart.lines().length) {
+    <div class="empty">
+      <p>Your cart is empty.</p>
+      <a class="primary link" routerLink="/shop">Browse products</a>
+    </div>
+  } @else {
+    <ul class="lines">
+      @for (line of cart.lines(); track line.sku) {
+        <li>
+          <div class="art small">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path [attr.d]="icon(line.sku, line.category)" />
+            </svg>
+          </div>
+          <div class="line-info">
+            <a [routerLink]="['/shop', line.sku]" class="name">{{ line.name }}</a>
+            <span class="muted">{{ price(line.unit_price) }} each</span>
+          </div>
+          <div class="qty" aria-label="Quantity">
+            <button type="button" (click)="cart.setQuantity(line.sku, line.quantity - 1)" aria-label="Fewer">−</button>
+            <span>{{ line.quantity }}</span>
+            <button type="button" (click)="cart.setQuantity(line.sku, line.quantity + 1)"
+                    [disabled]="line.quantity >= max || line.quantity >= line.stock" aria-label="More">+</button>
+          </div>
+          <strong class="line-total">{{ price(line.unit_price * line.quantity) }}</strong>
+          <button type="button" class="remove" (click)="cart.remove(line.sku)" aria-label="Remove">×</button>
+        </li>
+      }
+    </ul>
+
+    <div class="totals">
+      <div><span>Subtotal</span><strong>{{ price(cart.subtotal()) }}</strong></div>
+      <p class="muted small">Shipping is calculated at checkout from your province. Free from 500.000đ.</p>
+      <a class="primary link" routerLink="/checkout">Go to checkout</a>
+    </div>
+  }
+</main>

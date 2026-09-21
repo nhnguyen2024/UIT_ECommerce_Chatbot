@@ -9,8 +9,15 @@
   </a>
 
   <nav class="nav">
+    <a routerLink="/shop" routerLinkActive="on">Shop</a>
     <a routerLink="/" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: true }">Support</a>
     <a routerLink="/admin" routerLinkActive="on">Operations</a>
+    <a routerLink="/cart" routerLinkActive="on" class="cart" [attr.aria-label]="'Cart, ' + cart.count() + ' items'">
+      Cart
+      @if (cart.count()) {
+        <span class="badge">{{ cart.count() }}</span>
+      }
+    </a>
   </nav>
 
   <button

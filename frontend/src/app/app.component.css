@@ -57,6 +57,19 @@
 }
 .nav a:hover { background: var(--surface-2); color: var(--ink); }
 .nav a.on { background: var(--accent-wash); color: var(--accent); }
+.nav .cart { display: inline-flex; align-items: center; gap: 6px; }
+.badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 99px;
+  background: var(--accent);
+  color: var(--ground);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
 
 .theme {
   padding: 7px 13px;

@@ -16,7 +16,7 @@
             "index": "src/index.html",
             "polyfills": [],
             "tsConfig": "tsconfig.app.json",
-            "assets": [],
+            "assets": [{ "glob": "**/*", "input": "public" }],
             "styles": ["src/styles.css"],
             "outputPath": "dist/support-chat"
           },
