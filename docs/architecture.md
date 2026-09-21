@@ -68,14 +68,30 @@ order store in this system stands in for exactly that: records the seller alread
 possesses, carrying the channel they came from. Adding a live API would change
 where the rows come from, not how the assistant reasons about them.
 
+**Where the data would come from in production.** The seller owns every order,
+wherever it was placed, and can read it:
+
+| Order | Status and tracking source |
+|---|---|
+| Website | The seller's own system; the seller books the carrier |
+| Marketplace, seller-arranged shipping | The seller's own carrier booking, as above |
+| Marketplace, platform-arranged shipping (SPX, Lazada Express, ...) | The marketplace's seller API, which exposes the seller's orders and their logistics events; the same data Seller Centre shows |
+
+What the seller does not get for platform-shipped orders is a direct line to
+that courier or anything the platform chooses not to share. Carrier events name
+places ("arrived at the Đà Nẵng sorting hub"), never live coordinates, in every
+case. The tracking map (§4, *Routes*) is built to that level of detail and no
+finer, so it shows only what a real seller could actually know.
+
 The assistant serves **Vietnamese and English**. All source code, identifiers,
 and documentation are English; the two languages appear only as content.
 
 ### Explicit non-goals
 
-- No purchasing, payment, or order modification. The assistant reads; it never
+- The assistant never places, pays for, or modifies an order. It reads; it never
   writes to commerce state. This keeps the blast radius of a wrong answer to
-  misinformation rather than money.
+  misinformation rather than money. Orders are placed by the storefront's guest
+  checkout (§2, *Storefront*), which takes no real payment.
 - No general conversation. Anything outside the three jobs is declined.
 - No claims about products the store does not stock.
 - **No live marketplace integration.** No Shopee, Lazada, or TikTok Shop API is
@@ -119,6 +135,22 @@ Both model calls, the classifier's and the orchestrator's, reach Claude through
 one of two providers: Anthropic's API directly, or Snowflake Cortex. They speak
 the same Messages API, so nothing in the diagram changes between them. The choice
 and its limits are in §9, *Model provider*.
+
+### Storefront
+
+The website also sells: a catalogue, product pages, a cart kept in the browser,
+and a guest checkout (`app/api/shop.py`, `frontend/src/app/shop/`). It exists to
+make the business visible. Each product records the channels it is listed on,
+and the product page shows them, so the multi-channel premise of §1 is on screen
+rather than asserted. It is deliberately small: no accounts, and a demo payment
+step that takes no money.
+
+Two properties matter. Checkout prices every line from the database and ignores
+anything price-like from the client, and it reserves stock with conditional
+decrements, rolling the whole cart back if one line fails. And an order placed
+here is an ordinary website order, stored with hashed contact details and a
+planned route, so the assistant tracks it like any other. That gives the demo a
+closed loop: buy on the site, then ask the assistant where the order is.
 
 ### Component responsibilities
 
@@ -264,6 +296,26 @@ The first version used a *sparse* index, which looks like the right tool and is
 not: sparse skips only documents where the field is absent, not null. No unit
 test could catch that; the first seed against a real cluster did, and a
 regression test now pins the partial filter.
+
+### Routes
+
+Each order carries a destination and a route: warehouse, regional sorting hubs,
+destination, with the time the parcel reached each stop. Orders store place keys;
+coordinates live in one table (`app/geo.py`). That mirrors how carrier data
+arrives, as named scan points, and lets the map be corrected without touching
+order data.
+
+The destination is a **province, never an address**. The map needs nothing finer,
+and anything shown in the chat window is visible to whoever holds the order code
+and contact. `get_order_status` returns place names to the model, so it can answer
+"where is it now", and a separate payload with coordinates to the interface. That
+payload exists only after the contact check passes.
+
+The map is committed SVG geometry generated from Natural Earth
+(`frontend/scripts/build_vietnam_map.py`), not a tile service. No third party
+receives the shopper's route, the demo works offline, and the map shows Hoàng Sa
+and Trường Sa, which Natural Earth does not assign to Vietnam and common tile
+sets omit or label otherwise.
 
 ### One embedded field per document
 
@@ -628,7 +680,7 @@ the failure mode this design is exposed to.
 
 **Metrics are pure functions.** All scoring lives in a module with no network
 calls, so every metric is unit tested without spending money. The tests are part
-of the 225-test suite.
+of the backend's test suite (363 tests).
 
 **Gold labels are validated against the corpus.** A test asserts every
 `gold_chunks` entry names a chunk that actually exists. A typo there reports
@@ -647,8 +699,13 @@ Scoring one as a failure would measure conformity rather than capability.
 dataset order cannot affect results.
 
 **The runner requires confirmation before spending.** It prints a cost estimate
-and waits. Concurrency is bounded by a semaphore, because firing 49 turns at once
+and waits. Concurrency is bounded by a semaphore, because firing 56 turns at once
 produces rate limit errors rather than results.
+
+### Results
+
+Run history, the judge calibration and per-case analysis are in
+[`evaluation.md`](evaluation.md).
 
 ---
 
@@ -670,9 +727,18 @@ The image is built with `az acr build`, in Azure rather than locally. Building o
 an Apple Silicon machine and pushing produces an arm64 image that fails with
 `exec format error`.
 
-The frontend calls same-origin `/api/*` paths. Static Web Apps rewrites them to
-the backend, so no hostname is compiled into the bundle and the same build works
-in development and production.
+The browser calls the backend directly. Static Web Apps cannot rewrite `/api` to
+an external host (rewrite targets must be paths inside the app), and linking a
+Container App as its managed API needs the paid Standard plan. So the bundle reads
+the backend's address at runtime from `config.js`, which is empty in development,
+where the Angular dev server proxies `/api`, and written by
+`infra/deploy-frontend.sh` in production. One build serves both. The backend
+admits the site's origin through `CORS_ORIGINS`.
+
+Costs on the student credit: Container Apps on the consumption plan scale to zero
+and fall inside the monthly free grant at this traffic; the Basic container
+registry is the one fixed cost, about 5 USD a month; Static Web Apps Free and
+Atlas M0 cost nothing.
 
 Secrets are Container Apps secrets referenced by `secretref:`, never baked into
 the image. The deploy script reads `LLM_PROVIDER` and sends only the credential
@@ -722,8 +788,30 @@ subscription may deploy only to `koreacentral`, `japanwest`,
 (Hong Kong) and the model in Japan East, because East Asia offers only
 provisioned model capacity.
 
-**Automated Embedding is a public preview feature.** The `explicit` fallback
-exists for this reason but has not been exercised end to end.
+**Automated Embedding is a public preview feature,** and on a free M0 cluster
+its query rate depends on billing: 3 queries a minute without a payment method
+on the Atlas organisation, 2,000 with one. The first real run hit the lower
+limit; a payment method was added, and the free token allowance means nothing is
+charged at this volume. The `explicit` fallback exists for these reasons but has
+not been exercised end to end.
+
+**Verification assumes the seller holds the buyer's contact.** Marketplaces
+increasingly mask the buyer's phone number and address from sellers. For such
+orders, "order code plus phone" could not verify, and a real deployment would
+need another second factor, such as the marketplace username.
+
+**Marketplace rules.** Platforms discourage moving buyers off-platform. A real
+seller would present this site as after-sales support for its own customers and
+check each marketplace's policy.
+
+**The storefront is a demonstration.** No accounts, no real payment, and
+delivery to province level only. Stock is reserved at checkout, but nothing
+restocks cancelled orders.
+
+**The judge cannot see the data.** It grades a reply against a rubric without the
+tool results, so it can mark down a correct specification it has no way to check
+(case `prd-en-04`). Grounding is measured separately and deterministically for
+exactly this reason.
 
 **Numeric grounding is a heuristic.** It compares figures textually and will
 produce false positives, for example when the model correctly rounds or restates

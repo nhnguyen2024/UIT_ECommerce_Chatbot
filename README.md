@@ -26,7 +26,9 @@ It covers three jobs:
 
 1. **Product consultation** — semantic and keyword search over a product catalogue, with filters on category, price, and rating.
 2. **Policy questions** — retrieval-augmented answers over store policy documents, where every claim cites the passage it came from. Return windows, refund destinations, and shipping fees differ per channel, and the answer has to follow the channel the order came from.
-3. **Order tracking** — status and delivery timeline lookups across all four channels, accepting either the store's own order code or the marketplace's, gated behind identity verification.
+3. **Order tracking** — status and delivery timeline lookups across all four channels, accepting either the store's own order code or the marketplace's, gated behind identity verification. A verified order's route (warehouse, sorting hubs, destination province) is drawn on a map of Vietnam in the chat.
+
+Around the chatbot, the website is a small **storefront**: a catalogue showing which channels list each product, a cart, and a guest checkout with demo payment. An order placed there is an ordinary website order, so the demo closes the loop: buy on the site, then ask the assistant where the order is.
 
 The chatbot answers in **Vietnamese and English**. All source code, comments, and documentation are in English; both languages appear only as content.
 
@@ -197,8 +199,10 @@ cd backend
 ```
 
 Every run costs money, so the runner prints an estimate and waits for
-confirmation. Results are written to `evals/results/` as JSON and as a Markdown
-table ready to paste into a report.
+confirmation. Results are written to `evals/results/` (git-ignored) as JSON and
+as a Markdown table ready to paste into a report. The runs so far, and what each
+fix changed, are recorded in [docs/evaluation.md](docs/evaluation.md). A full run
+costs about 0.12 USD on `gpt-5-mini`.
 
 Measured:
 
@@ -235,18 +239,20 @@ the review queue quotes shopper messages.
 ## Deployment
 
 ```bash
-./infra/deploy-backend.sh
+LOCATION=eastasia REGISTRY=<registry name> BUILD_MODE=local ./infra/deploy-backend.sh
 BACKEND_URL=https://<printed url> ./infra/deploy-frontend.sh
 ```
 
 The backend runs on Azure Container Apps, scaled to zero so an idle demo costs
 nothing, with secrets passed as Container Apps secrets rather than baked into the
-image. The frontend is a static bundle on Azure Static Web Apps, which rewrites
-`/api/*` to the backend so no hostname is compiled into the client.
+image. The frontend is a static bundle on Azure Static Web Apps. It reads the
+backend's URL at runtime from `config.js`, written by the deploy script, and calls
+it directly; the backend admits the site through `CORS_ORIGINS`.
 
-The image is built with `az acr build` rather than locally, which produces a
-linux/amd64 image regardless of the developer's machine. Building locally on
-Apple Silicon and pushing produces an image that fails with `exec format error`.
+By default the image is built in Azure with `az acr build`. Azure for Students
+subscriptions refuse that (`TasksOperationsNotAllowed`), so `BUILD_MODE=local`
+builds with the local Docker instead, pinned to `linux/amd64`: an unpinned build
+on Apple Silicon produces an image that fails with `exec format error`.
 
 See [docs/setup.md](docs/setup.md) for the full walkthrough and troubleshooting.
 

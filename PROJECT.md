@@ -3,7 +3,7 @@
 Working notes for this repository. Read this first; it is written so that a
 session can pick up the work without scanning the codebase.
 
-Last updated: **2026-09-21**. Keep this file current with every change.
+Last updated: **2026-09-22** (overnight session). Keep this file current with every change.
 
 ---
 
@@ -204,27 +204,29 @@ Non-obvious decisions, each argued at length in `docs/architecture.md`:
 
 ## 5. Current state
 
-**Working and verified:** 291 tests pass (`.venv/bin/python -m pytest -q`,
-~0.7s, needs no database or network). All modules import. Order generation is
-deterministic across runs. The Angular app builds and was driven with Playwright
-(product cards, both themes).
+**Working and verified:** 363 backend tests pass (`.venv/bin/python -m pytest -q`,
+~1 s, no database or network). The Angular app builds (`npx ng build`) and every
+page was driven with Playwright against the real backend and model, including
+the full loop: shop → cart → checkout → order created → "track with the
+assistant" → route map shown.
 
-**Real services, 2026-09-21:** the model provider passes every probe check on the
-deployed `gpt-5-mini`; Atlas is reachable (MongoDB 8.0) and holds the seeded data
-(480 products, 26 policy chunks, 325 orders); `products_vector` and
-`products_text` and `policies_vector` are READY. **`seed.smoke`: all 24 checks
-pass** (products, policies, 11 order checks, handoff), after the embedding rate
-limit was lifted (see below). **End to end works locally** (backend on :8000,
-Angular on :4200, real `gpt-5-mini`): product, policy, order (internal and Shopee
-code, VI and EN) and handoff turns all answer correctly with the right tool and
-citations, at about $0.001–0.004 and 8–16 s per turn. Nothing is deployed and the
-evaluation has not run yet.
+**Real services, 2026-09-21:** model provider passes every probe check on
+`gpt-5-mini`; Atlas holds the seeded data (480 products, 26 policy chunks, 325
+orders) with `products_vector`, `products_text` and `policies_vector` READY;
+`seed.smoke` passes all 24 checks.
 
-**Observed on gpt-5-mini, for the eval to confirm:** it sometimes offers things the
-bot cannot do ("keep monitoring the delivery for you"); a vague product question
-("tai nghe chống ồn dưới 2 triệu") got a clarifying question instead of a search.
-Latency of 8–16 s is mostly reasoning at `AGENT_EFFORT=medium`; try `low` if the
-eval shows no accuracy loss.
+**Evaluation (see `docs/evaluation.md`):** first full run 66% answer pass rate;
+after a judge calibration and fixes, **94.6–98.2%** across two identical final
+runs (quote the range), policy recall@5 87.5–97.5% (run-to-run variance in the
+model's search queries), tool selection, groundedness and security 100%, 0
+errors, about 0.12–0.13 USD per full run and ~13 s per turn. Eval spend to date
+is about 1.05 USD of the 3 USD the developer allowed.
+
+**Features added 2026-09-21 (night):** order route map (warehouse → hubs →
+destination province, `app/geo.py`, `order-map.component`); storefront with
+catalogue, product page showing which channels list the product, cart, guest
+checkout with demo payment (`app/api/shop.py`, `frontend/src/app/shop/`);
+content-filter rejections become polite refusals; reply language stated per turn.
 
 **Known cosmetic issue:** at process exit, Python 3.14 with `httpcore2` logs
 *"generator didn't stop after athrow()"* for OpenAI streams. It reproduces with a
@@ -334,15 +336,17 @@ Also open: the token in `backend/.env` is still the one exposed in a chat. It
 authenticates, so it was not replaced. Remove it (`ALTER USER CHATBOT_SVC REMOVE
 PROGRAMMATIC ACCESS TOKEN CHATBOT_BACKEND;`) whatever is decided.
 
-### Known issue: the frontend deploy is broken as written
+### Fixed: the frontend deploy (2026-09-22)
 
-`infra/deploy-frontend.sh` writes a Static Web Apps rule rewriting `/api/*` to the
-backend's full URL. Microsoft's docs say rewrite targets *"must be relative to the
-root of the app"*, so the site would load and every chat request would fail.
-Linking a Container App as the API backend needs the **paid Standard** plan.
-Planned fix: stay on the Free plan and have the frontend call the backend URL
-directly (the backend already supports CORS). `docs/architecture.md` §11 still
-describes the rewrite and must be corrected together with the fix.
+Static Web Apps cannot rewrite `/api` to an external URL on the Free plan. The
+bundle now reads the backend URL at runtime from `config.js` (empty in dev, where
+the Angular proxy handles `/api`; written by `infra/deploy-frontend.sh` in
+production) and calls the backend directly; the backend admits the site through
+`CORS_ORIGINS`. `docs/architecture.md` §11 updated.
+
+**ACR Tasks are refused on Azure for Students** (`TasksOperationsNotAllowed`), so
+`az acr build` fails. `BUILD_MODE=local` in `deploy-backend.sh` builds with the
+local Docker Desktop, pinned to `linux/amd64`, and pushes. Docker must be running.
 
 ## 6. What is left
 
@@ -358,14 +362,17 @@ describes the rewrite and must be corrected together with the fix.
    bugs fixed on the way, see §4). `seed.smoke` passes in full (after adding a
    payment method to Atlas to lift the embedding rate limit, see §5).
 3. ~~Run the chatbot locally end to end~~ (done 2026-09-21, see §5).
-4. **Run the full evaluation and commit the results.** `backend/evals/results/`
-   does not exist yet; the report needs this table (intent routing,
-   recall@3/@5, MRR, groundedness, security pass rate, cost, latency). It is
-   the biggest gap. Under Cortex it spends credits, and the trial caps Cortex at
-   about ten credits a day without a card. **Run it well before 2026-10-21**,
-   when the trial ends.
-5. Deploy the backend (`LOCATION=eastasia ./infra/deploy-backend.sh`). Fix the
-   frontend deploy (see Known issue above), deploy it, set `CORS_ORIGINS`.
+4. ~~Run the full evaluation~~ (done 2026-09-22; `docs/evaluation.md` holds the
+   run history and the numbers for the report. Per-run output in
+   `backend/evals/results/` is git-ignored on purpose).
+5. Deploy: see the DEPLOY STATUS line in §5 for where it stands.
+6. Added on request 2026-09-21: order route map; storefront with cart and guest
+   checkout (demo payment, no accounts). Done.
+
+**Decisions the developer made on 2026-09-21 (night):** payment is demo only (no
+gateway); guest checkout only (no accounts); the map is shown for every verified
+order. Open question for the developer: show the map only for website and
+seller-shipped orders, with platform-shipped orders showing status only?
 
 **Weeks 2–3: Snowflake analytics module (additive; the chatbot must keep working
 without it).** Export conversations, telemetry and orders from MongoDB to
@@ -395,25 +402,24 @@ analytical split). Not designed yet.
 Raising these first is a defense strategy, not an oversight. Keep them in the
 report.
 
-- The model provider runs on a Snowflake trial: suspended after 30 days or when
-  its credits run out, and capped at about ten Cortex credits a day without a card.
+- The model is `gpt-5-mini` (student-credit quota), smaller than the Claude model
+  the prompts were first written for. The eval measures the result.
 - No live marketplace integration (a scope decision; see §2). The untested part
   is the ingestion path: reconciling exports, platform status vocabularies, and
   codes that change after a split shipment.
-- All data is synthetic.
-- Automated Embedding is a public preview feature; the `EMBEDDING_MODE=explicit`
+- Marketplaces increasingly mask buyer phone/address from sellers; for those
+  orders "code + phone" could not verify, and a real deployment needs another
+  second factor. Platforms also discourage moving buyers off-platform.
+- All data is synthetic. The storefront is a demo: no accounts, no payment,
+  province-level delivery, no restocking of cancelled orders.
+- Automated Embedding is a public preview feature and needs a payment method on
+  the Atlas organisation for a usable query rate; the `EMBEDDING_MODE=explicit`
   fallback has never been exercised end to end.
-- Numeric grounding is a textual heuristic. It produces false positives when the
-  model correctly rounds or restates a figure, so it is reported, never enforced.
+- Numeric grounding is a textual heuristic, reported, never enforced.
+- The eval judge cannot see tool data, so it can mark down a correct spec
+  (`prd-en-04`).
 - Conversation memory is a fixed 12-turn window with no summarisation.
-- Single-turn evaluation only.
-- No load testing.
-- Under Cortex, telemetry's per-turn cost is the Anthropic list-price equivalent,
-  not the Snowflake credits actually billed.
-- Claude has no in-region host in Snowflake, so chat messages are processed by
-  cross-region inference, possibly outside Asia. Acceptable for synthetic demo
-  data; a real store would have to consider data residency. Not yet added to
-  `docs/architecture.md` §12.
+- Single-turn evaluation only. No load testing.
 
 ## 7. Conventions
 
@@ -436,6 +442,19 @@ report.
 - **Update this file with every change**, in the same commit.
 
 ## 8. Changelog
+
+**2026-09-22 (overnight), evaluation, map, storefront, deploy fixes.** First full
+eval run (66% pass); judge calibrated (re-grading the same answers: 91%), then
+fixes for every genuine fault: content-filter 400 as a refusal, per-turn reply
+language, classifier categories/complaints/credentials (one regression caught
+and fixed), search-first product advice, warranty-on-every-channel sentence,
+refund search filter, out-of-scope reply naming categories. Final: 94.6–98.2%
+pass over two identical runs, all in `docs/evaluation.md`. Added the order route map
+(`app/geo.py`, `order-map.component`, Natural Earth SVG with Hoàng Sa and
+Trường Sa) and the storefront (catalogue with channel listings, cart, guest
+checkout, confirmation handing the order to the assistant). Fixed the frontend
+deploy (runtime `config.js` + CORS) and added `BUILD_MODE=local` for the
+student subscription's ACR Tasks block. Committed in logical commits, not pushed.
 
 **2026-09-21, first end-to-end run; two chat UI fixes.** Atlas payment method
 added, lifting the embedding limit; `seed.smoke` passes all 24 checks. Real turns
