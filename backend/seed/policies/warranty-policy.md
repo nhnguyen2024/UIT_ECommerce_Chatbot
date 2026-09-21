@@ -21,6 +21,8 @@ Thời hạn bảo hành được tính từ ngày giao hàng thành công:
 
 Pin và bộ sạc là linh kiện tiêu hao, được bảo hành 3 tháng.
 
+Các thời hạn trên áp dụng như nhau cho mọi nơi đặt hàng: website Northlight, Shopee, Lazada và TikTok Shop.
+
 @en
 The warranty period is counted from the successful delivery date:
 
@@ -32,6 +34,8 @@ The warranty period is counted from the successful delivery date:
 - Chargers, cables, and power banks: 12 months.
 
 Batteries and chargers are consumable parts and carry a 3 month warranty.
+
+These periods apply the same wherever the order was placed: the Northlight website, Shopee, Lazada, or TikTok Shop.
 
 ## [coverage] Phạm vi bảo hành | What the warranty covers
 

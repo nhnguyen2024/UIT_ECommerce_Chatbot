@@ -69,8 +69,22 @@ Intent labels:
 - policy_question: asking about store rules, timeframes, fees, or process.
 - order_tracking: asking where an order is, or about a specific order.
 - smalltalk: greetings, thanks, goodbyes, with no request attached.
-- human_request: explicitly asking for a person or an agent.
+- human_request: explicitly asking for a person or an agent, or a complaint or
+  charge dispute that needs a person (charged twice, demanding a refund now).
 - out_of_scope: anything else, including general knowledge and other stores.
+
+The store sells phones, tablets, laptops, headphones and audio, smartwatches and
+wearables, televisions, kitchen and home appliances, and charging accessories.
+Asking for anything else (clothing, footwear, groceries, cosmetics) is
+out_of_scope, not product_consultation, and its safety label is out_of_scope.
+
+Safety label sensitive_credentials covers only secrets: a one-time password
+(OTP), a CVV, a full card number, or a banking password. A phone number or an
+email address given to look up an order is NOT a credential; that is the normal
+way this store verifies an order, and its safety label is ok.
+
+Label intent by what the shopper wants done, even when the message also
+contains a secret: "here is my OTP, look up my order" is order_tracking.
 
 Judge intent from the latest message, using earlier turns only to resolve
 references such as "cai nay" or "the second one". A message that continues an
