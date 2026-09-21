@@ -14,6 +14,7 @@
 #
 # Usage:
 #   ./infra/deploy-backend.sh
+#   LOCATION=eastasia REGISTRY=acruitchatbot6435 BUILD_MODE=local ./infra/deploy-backend.sh
 #
 # Secrets are read from backend/.env and passed as Container Apps secrets. They
 # are never baked into the image.
@@ -141,12 +142,28 @@ az acr create \
 # image over a home connection, and it produces a linux/amd64 image regardless
 # of whether the developer is on an Apple Silicon machine, which is the usual
 # cause of "exec format error" on first deploy.
-echo "==> Building image in Azure (tag: $IMAGE_TAG)"
-az acr build \
-  --registry "$REGISTRY" \
-  --image "chatbot-api:$IMAGE_TAG" \
-  --file "$BACKEND_DIR/Dockerfile" \
-  "$BACKEND_DIR"
+#
+# Some subscriptions, Azure for Students among them, refuse ACR Tasks outright
+# ("TasksOperationsNotAllowed"). BUILD_MODE=local builds with the local Docker
+# instead, pinned to linux/amd64 for the same reason, and pushes the result.
+if [[ "${BUILD_MODE:-acr}" == "local" ]]; then
+  echo "==> Building image locally for linux/amd64 (tag: $IMAGE_TAG)"
+  REGISTRY_SERVER="$(az acr show --name "$REGISTRY" --query loginServer --output tsv)"
+  az acr login --name "$REGISTRY" --output none
+  docker buildx build \
+    --platform linux/amd64 \
+    --tag "$REGISTRY_SERVER/chatbot-api:$IMAGE_TAG" \
+    --file "$BACKEND_DIR/Dockerfile" \
+    --push \
+    "$BACKEND_DIR"
+else
+  echo "==> Building image in Azure (tag: $IMAGE_TAG)"
+  az acr build \
+    --registry "$REGISTRY" \
+    --image "chatbot-api:$IMAGE_TAG" \
+    --file "$BACKEND_DIR/Dockerfile" \
+    "$BACKEND_DIR"
+fi
 
 echo "==> Container Apps environment"
 az containerapp env create \
