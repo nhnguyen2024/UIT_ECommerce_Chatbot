@@ -76,6 +76,20 @@ OUT_OF_SCOPE_REPLY = {
 }
 
 
+DECLINED_REPLY = {
+    "vi": (
+        "Xin lỗi, mình không thể thực hiện yêu cầu này. Mình có thể tư vấn sản "
+        "phẩm, giải đáp chính sách đổi trả, bảo hành, vận chuyển, thanh toán hoặc "
+        "tra cứu đơn hàng cho bạn."
+    ),
+    "en": (
+        "Sorry, I can't help with that request. I can help you choose a product, "
+        "explain our return, warranty, shipping and payment policies, or check on "
+        "an order."
+    ),
+}
+
+
 @dataclass
 class InputVerdict:
     """Outcome of the pre-agent screen."""

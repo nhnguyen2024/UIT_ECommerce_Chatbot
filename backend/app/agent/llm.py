@@ -113,6 +113,37 @@ def _unreachable() -> ModelError:
     return ModelError("connection_error", "The assistant is unreachable right now.")
 
 
+class ContentFiltered(ModelError):
+    """The provider's own safety filter rejected the request before the model ran.
+
+    Azure OpenAI screens every prompt (Prompt Shields, plus the hate, sexual,
+    violence and self-harm classifiers) and answers a flagged one with HTTP 400
+    instead of a completion. That is a verdict on the shopper's message, not an
+    outage, so callers treat it as a refusal rather than "unavailable".
+    """
+
+    def __init__(self, categories: list[str]) -> None:
+        self.categories = categories
+        super().__init__(
+            "content_filter:" + (",".join(categories) or "unspecified"),
+            "The assistant declined to answer this request.",
+        )
+
+
+def content_filter_categories(exc: "openai.APIStatusError") -> list[str] | None:
+    """The filtered categories if this error is a content-filter rejection, else None."""
+    body = exc.body if isinstance(exc.body, dict) else {}
+    if exc.status_code != 400 or body.get("code") != "content_filter":
+        return None
+    inner = body.get("innererror") or {}
+    results = inner.get("content_filter_result") or {}
+    return sorted(
+        name
+        for name, verdict in results.items()
+        if isinstance(verdict, dict) and verdict.get("filtered")
+    )
+
+
 class Conversation(ABC):
     """One user turn's exchange with the model, across tool rounds."""
 
@@ -409,6 +440,16 @@ class OpenAIConversation(Conversation):
                         if choice.finish_reason:
                             finish_reason = choice.finish_reason
         except openai.APIStatusError as exc:
+            categories = content_filter_categories(exc)
+            if categories is not None:
+                logger.info("Azure content filter rejected the turn: %s", categories)
+                yield RoundResult(
+                    text="",
+                    tool_calls=[],
+                    refused=True,
+                    refusal_detail="content_filter:" + (",".join(categories) or "unspecified"),
+                )
+                return
             logger.exception("Azure OpenAI API error during turn")
             raise _unavailable(exc.status_code) from exc
         except openai.APIConnectionError as exc:
@@ -508,6 +549,9 @@ class OpenAIBackend(ModelBackend):
         try:
             completion = await self._client.chat.completions.parse(**params)
         except openai.APIStatusError as exc:
+            categories = content_filter_categories(exc)
+            if categories is not None:
+                raise ContentFiltered(categories) from exc
             raise _unavailable(exc.status_code) from exc
         except openai.APIConnectionError as exc:
             raise _unreachable() from exc

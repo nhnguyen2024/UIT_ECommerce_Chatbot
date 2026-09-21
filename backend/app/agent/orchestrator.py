@@ -26,7 +26,12 @@ from dataclasses import dataclass, field
 from typing import Any, AsyncIterator
 
 from app.agent.classifier import classify_turn
-from app.agent.guardrails import check_citations, check_numeric_grounding, screen_input
+from app.agent.guardrails import (
+    DECLINED_REPLY,
+    check_citations,
+    check_numeric_grounding,
+    screen_input,
+)
 from app.agent.llm import ModelError, RoundResult, ToolCall, ToolOutcome, Usage, get_backend
 from app.agent.prompts import SYSTEM_PROMPT
 from app.agent.tools import ToolContext, registry
@@ -211,13 +216,21 @@ async def run_turn(
             state.usage.add(result.usage)
 
             if result.refused:
-                state.error = f"refusal:{result.refusal_detail}"
-                yield {
-                    "type": "error",
-                    "message": "The assistant declined to answer this request.",
-                }
+                # A refusal is an answer, not a failure: the shopper gets a
+                # short decline in their language and the usual redirect. Any
+                # partial text is dropped, since a refusal can arrive mid-reply;
+                # the done event's text replaces whatever was streamed.
+                logger.info("turn refused for session %s: %s", session_id, result.refusal_detail)
+                state.blocked = True
+                reply = DECLINED_REPLY["vi" if state.lang == "vi" else "en"]
+                if not answer_parts:
+                    yield {"type": "text", "delta": reply}
                 yield _done_event(
-                    text="".join(answer_parts), citations=[], state=state, started=started
+                    text=reply,
+                    citations=[],
+                    state=state,
+                    started=started,
+                    block_reason=f"refusal:{result.refusal_detail}",
                 )
                 return
 

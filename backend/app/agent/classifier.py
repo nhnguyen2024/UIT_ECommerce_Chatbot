@@ -25,7 +25,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.agent.llm import ModelError, get_backend
+from app.agent.llm import ContentFiltered, ModelError, get_backend
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -87,6 +87,16 @@ DEFAULT = TurnClassification(
 )
 
 
+# Letters that occur in Vietnamese and not in English. One is enough: shoppers
+# who type without diacritics are caught by the model, not by this fallback.
+VIETNAMESE_LETTERS = set("ăâđêôơưàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ")
+
+
+def guess_language(text: str) -> Literal["vi", "en"]:
+    """Best guess at the reply language when the classifier could not run."""
+    return "vi" if VIETNAMESE_LETTERS & set(text.lower()) else "en"
+
+
 async def classify_turn(
     message: str, history: list[dict] | None = None
 ) -> TurnClassification:
@@ -128,6 +138,17 @@ async def classify_turn(
             # Labelling one message needs no deliberation, and this runs on
             # every turn, so it asks for the least reasoning the provider allows.
             effort="minimal",
+        )
+    except ContentFiltered as exc:
+        # The provider refused even to label the message. Its prompt shield is
+        # the likeliest reason, so record the turn as an injection attempt. The
+        # language is guessed from the text, since no model read it.
+        logger.info("classifier input was content-filtered: %s", exc.categories)
+        return TurnClassification(
+            language=guess_language(message),
+            intent="out_of_scope",
+            safety="injection_attempt" if "jailbreak" in exc.categories else "out_of_scope",
+            confidence=1.0,
         )
     except ModelError:
         # Network trouble, rate limit, or a malformed response. The turn goes
