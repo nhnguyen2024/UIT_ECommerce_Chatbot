@@ -116,8 +116,9 @@
 
 /* --- Product cards ------------------------------------------------------ */
 
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 10px; margin-top: 18px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); gap: 10px; margin-top: 18px; }
 .card {
+  position: relative;
   display: flex; gap: 13px; min-width: 0;
   padding: 13px;
   border: 1px solid var(--border);
@@ -126,27 +127,54 @@
   transition: border-color 0.15s;
 }
 .card:hover { border-color: var(--border-strong); }
+.card:hover .thumb { color: var(--accent); border-color: var(--accent-dim); }
 
+/* The glyph tile. A tinted panel rather than the old gradient block: the
+ * gradient competed with the product name for attention, and an icon needs a
+ * calm background to stay legible at 24px. */
 .thumb {
   flex: none; width: 46px; height: 46px;
   display: grid; place-items: center;
   border-radius: var(--radius-sm);
-  background: linear-gradient(145deg, var(--aurora-a), var(--aurora-c));
-  color: var(--ground);
-  font-family: var(--font-display); font-weight: 700; font-size: 14px;
-  text-transform: uppercase;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  transition: color 0.15s, border-color 0.15s;
 }
+.thumb svg { width: 23px; height: 23px; }
 
 .detail { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .brand { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); }
 .name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pricing { display: flex; align-items: baseline; gap: 7px; }
+.card:has(.off) .brand { padding-right: 42px; }
+.pricing { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
 .now { font-size: 13.5px; font-weight: 600; color: var(--accent); }
 .was { font-size: 11px; color: var(--ink-3); }
+
+/* Discount badge, pinned to the corner rather than sitting in the price row.
+ * Inline, a long đồng figure plus a struck price plus a badge overflowed a
+ * narrow column, and each card wrapped at a different point, so a row of
+ * results came out ragged. The corner is also where a shopper looks for it. */
+.off {
+  position: absolute; top: 9px; right: 9px;
+  font-family: var(--font-mono); font-size: 9.5px; font-weight: 500;
+  padding: 1.5px 6px; border-radius: 99px;
+  color: var(--status-warn);
+  background: color-mix(in srgb, var(--status-warn) 16%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--status-warn) 28%, transparent);
+}
+
 .meta { display: flex; gap: 11px; font-size: 11px; color: var(--ink-3); margin-top: 2px; }
-.rating { color: var(--chart-3); }
+.rating { color: var(--chart-3); display: inline-flex; align-items: baseline; gap: 3px; }
+.star { font-size: 10px; }
+.reviews { color: var(--ink-3); }
 .stock { color: var(--status-good); }
 .stock.out { color: var(--ink-3); }
+
+/* Out of stock stays readable. Dimming the whole card would hide the price,
+ * which is still the reason the shopper asked. */
+.card.sold-out .thumb { opacity: 0.55; }
+.card.sold-out .now { color: var(--ink-2); }
 
 /* --- Citations ---------------------------------------------------------- */
 

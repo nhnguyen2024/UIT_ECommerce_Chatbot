@@ -13,6 +13,8 @@ export interface Product {
   name_vi?: string;
   name_en?: string;
   brand?: string;
+  /** Category slug, e.g. "phones". Chooses the card's icon. */
+  category?: string;
   category_label?: string;
   price?: number;
   sale_price?: number | null;

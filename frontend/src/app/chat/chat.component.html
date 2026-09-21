@@ -47,11 +47,19 @@
           @if (message.products?.length) {
             <div class="cards">
               @for (product of message.products; track product.sku) {
-                <article class="card">
-                  <div class="thumb" aria-hidden="true">{{ (product.brand ?? product.sku).slice(0, 2) }}</div>
+                <article class="card" [class.sold-out]="!inStock(product)">
+                  @if (discount(product); as off) {
+                    <span class="off">-{{ off }}%</span>
+                  }
+                  <div class="thumb" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path [attr.d]="iconPath(product)" />
+                    </svg>
+                  </div>
                   <div class="detail">
                     <span class="brand">{{ product.brand ?? product.category_label }}</span>
-                    <strong class="name">{{ productName(product) }}</strong>
+                    <strong class="name" [title]="productName(product)">{{ productName(product) }}</strong>
                     <div class="pricing">
                       @if (product.sale_price != null) {
                         <span class="now">{{ price(product.sale_price) }}</span>
@@ -62,7 +70,12 @@
                     </div>
                     <div class="meta">
                       @if (product.rating != null) {
-                        <span class="rating">★ {{ product.rating }}</span>
+                        <span class="rating">
+                          <span class="star" aria-hidden="true">★</span>{{ product.rating }}
+                          @if (product.review_count) {
+                            <span class="reviews">({{ product.review_count }})</span>
+                          }
+                        </span>
                       }
                       <span class="stock" [class.out]="!inStock(product)">
                         {{ inStock(product) ? 'In stock' : 'Out of stock' }}
