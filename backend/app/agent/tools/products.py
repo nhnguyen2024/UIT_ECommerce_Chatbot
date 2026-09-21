@@ -33,6 +33,7 @@ _CARD_FIELDS = {
     "review_count": 1,
     "stock": 1,
     "images": 1,
+    "listed_on": 1,
 }
 
 
@@ -57,6 +58,10 @@ def _localise(document: dict, lang: str) -> dict:
         "in_stock": bool(document.get("stock", 0) > 0),
         "stock": document.get("stock"),
         "image": (document.get("images") or [None])[0],
+        # Shoppers ask whether an item is also on their usual marketplace.
+        "sold_on": [
+            schema.CHANNEL_LABELS.get(channel, channel) for channel in document.get("listed_on", ["website"])
+        ],
         "source_id": f"product:{document['sku']}",
     }
     if description := document.get(f"description_{suffix}"):

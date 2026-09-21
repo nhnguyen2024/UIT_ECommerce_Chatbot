@@ -453,6 +453,22 @@ def _round_price(value: int) -> int:
     return (value // 10_000) * 10_000 + 9_000
 
 
+# Share of the catalogue each marketplace carries.
+MARKETPLACE_COVERAGE = {"shopee": 0.85, "lazada": 0.6, "tiktok_shop": 0.45}
+
+
+def _listings(sku: str) -> list[str]:
+    """The channels a product is listed on: always the website, plus some marketplaces.
+
+    Seeded by SKU, apart from the main generator, so adding listings changed
+    no existing product.
+    """
+    rng = random.Random(f"listing:{sku}")
+    return ["website"] + [
+        channel for channel, share in MARKETPLACE_COVERAGE.items() if rng.random() < share
+    ]
+
+
 def generate_products(count: int = TARGET_COUNT) -> list[Product]:
     rng = random.Random(SEED)
     products: list[Product] = []
@@ -552,6 +568,7 @@ def generate_products(count: int = TARGET_COUNT) -> list[Product]:
                     stock=stock,
                     images=[f"https://cdn.example.vn/products/{sku.lower()}.jpg"],
                     tags=tags_vi + tags_en,
+                    listed_on=_listings(sku),
                 )
             )
 

@@ -135,6 +135,9 @@ class Product(BaseModel):
     stock: int
     images: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
+    # Where the product is listed. The website carries everything; each
+    # marketplace carries a subset, as a real seller's listings would.
+    listed_on: list[Channel] = Field(default_factory=lambda: ["website"])
 
     @property
     def effective_price(self) -> int:

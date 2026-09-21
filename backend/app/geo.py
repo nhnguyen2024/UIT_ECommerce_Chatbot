@@ -92,3 +92,26 @@ def plan_route(warehouse: str, destination: str) -> list[str]:
         if not route or route[-1] != stop:
             route.append(stop)
     return route
+
+
+# Shipping zones from the published shipping policy (shipping-policy.md,
+# "Shipping fees"). Checkout charges from this table, so the chatbot's quoted
+# fees and the fee a shopper actually pays come from the same rules.
+INNER_CITY = {"hanoi", "hcm"}
+MOUNTAINOUS = {"laocai"}
+FREE_SHIPPING_FROM = 500_000
+
+
+def shipping_fee(destination: str, subtotal: int) -> int:
+    if subtotal >= FREE_SHIPPING_FROM:
+        return 0
+    if destination in INNER_CITY:
+        return 25_000
+    if destination in MOUNTAINOUS:
+        return 55_000
+    return 35_000
+
+
+def nearest_warehouse(destination: str) -> str:
+    """The warehouse that ships to a province: Hanoi for the north, HCMC otherwise."""
+    return "wh-hanoi" if PLACES[destination].region == "north" else "wh-hcm"
