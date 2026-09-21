@@ -7,6 +7,7 @@ lifespan handler in app/main.py.
 
 from __future__ import annotations
 
+import certifi
 from pymongo import AsyncMongoClient
 from pymongo.asynchronous.database import AsyncDatabase
 
@@ -25,8 +26,24 @@ def get_client() -> AsyncMongoClient:
             # Fail fast on a bad URI rather than hanging a request for 30s.
             serverSelectionTimeoutMS=5000,
             tz_aware=True,
+            **tls_options(settings.mongodb_uri),
         )
     return _client
+
+
+def tls_options(uri: str) -> dict:
+    """Trust store for Atlas, which always requires TLS.
+
+    PyMongo verifies certificates against the operating system's store. The
+    python.org installer for macOS ships none, so on a stock Mac every Atlas
+    connection fails with CERTIFICATE_VERIFY_FAILED. certifi's bundle is what
+    MongoDB's own documentation recommends. It is passed only for mongodb+srv
+    URIs, because setting a CA file switches TLS on, and a plain local
+    mongodb://localhost server does not speak TLS.
+    """
+    if uri.startswith("mongodb+srv://"):
+        return {"tlsCAFile": certifi.where()}
+    return {}
 
 
 def get_db() -> AsyncDatabase:

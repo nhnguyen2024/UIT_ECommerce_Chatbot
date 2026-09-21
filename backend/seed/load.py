@@ -131,8 +131,18 @@ async def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-if __name__ == "__main__":
+async def run() -> int:
+    """Run and close the client in the same event loop.
+
+    The async client is bound to the loop it was created on. Closing it from a
+    second asyncio.run(), as this once did, raised on every run, successful or
+    not, and on a failed run buried the real error under the closing one.
+    """
     try:
-        sys.exit(asyncio.run(main()))
+        return await main()
     finally:
-        asyncio.run(close_client())
+        await close_client()
+
+
+if __name__ == "__main__":
+    sys.exit(asyncio.run(run()))

@@ -275,3 +275,48 @@ class TestCategoryConsistency:
 
         for template in TEMPLATES:
             assert template.slug in PRODUCT_CATEGORIES
+
+
+# --- Order indexes ----------------------------------------------------------
+
+
+class _RecordingCollection:
+    def __init__(self, name, calls):
+        self._name, self._calls = name, calls
+
+    async def create_index(self, keys, **options):
+        self._calls.append((self._name, keys, options))
+
+
+class _RecordingDb:
+    def __init__(self):
+        self.calls = []
+
+    def __getitem__(self, name):
+        return _RecordingCollection(name, self.calls)
+
+
+async def test_marketplace_code_index_skips_website_orders(monkeypatch):
+    """Regression: the unique index must not see website orders' null codes.
+
+    Website orders are written with an explicit `channel_order_code: null`. A
+    sparse index skips only absent fields, so it indexed every null and the
+    unique constraint rejected the second website order, failing the whole
+    seed against a real cluster. A partial filter on the string type is what
+    excludes them.
+    """
+    from app.db import indexes
+
+    db = _RecordingDb()
+    monkeypatch.setattr(indexes, "get_db", lambda: db)
+    await indexes.ensure_regular_indexes()
+
+    (options,) = [o for c, k, o in db.calls if c == "orders" and k == "channel_order_code"]
+    assert options["unique"] is True
+    assert options.get("sparse") is not True
+    assert options["partialFilterExpression"] == {"channel_order_code": {"$type": "string"}}
+
+    # And the condition it guards against really occurs in the seed data.
+    website = [o for o in generate_orders() if o.channel == "website"]
+    assert len(website) > 1
+    assert all(o.model_dump()["channel_order_code"] is None for o in website)

@@ -40,6 +40,11 @@ def _vector_field(path: str = "embedding_source") -> dict:
     if settings.embedding_mode == "auto":
         return {
             "type": "autoEmbed",
+            # Required since Automated Embedding added modalities other than
+            # text. Indexes defined without it are rejected with "Missing
+            # required 'modality' field for autoEmbed type", which is the
+            # preview-API churn the explicit mode exists to absorb.
+            "modality": "text",
             "path": path,
             "model": settings.voyage_model,
         }
@@ -119,10 +124,15 @@ async def ensure_regular_indexes() -> list[str]:
     created += ["policies.chunk_id", "policies.policy_type"]
 
     await db[schema.ORDERS].create_index("order_code", unique=True)
-    # Sparse: website orders have no marketplace code, and a plain unique index
-    # would treat all of their missing values as one colliding null.
+    # Partial, not sparse. Website orders carry channel_order_code as an explicit
+    # null, and a sparse index skips only documents where the field is absent:
+    # it indexes every null, and a unique index then rejects the second website
+    # order as a duplicate. Filtering on the string type indexes marketplace
+    # codes alone, however the empty value happens to be written.
     await db[schema.ORDERS].create_index(
-        "channel_order_code", unique=True, sparse=True
+        "channel_order_code",
+        unique=True,
+        partialFilterExpression={"channel_order_code": {"$type": "string"}},
     )
     await db[schema.ORDERS].create_index("channel")
     created += ["orders.order_code", "orders.channel_order_code", "orders.channel"]
