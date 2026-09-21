@@ -20,10 +20,9 @@ from __future__ import annotations
 import logging
 from typing import Literal
 
-import anthropic
 from pydantic import BaseModel, Field
 
-from app.agent.client import get_anthropic
+from app.agent.llm import ModelError, get_backend
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -80,18 +79,19 @@ async def judge_answer(*, message: str, rubric: str, answer: str) -> Judgement |
     )
 
     try:
-        response = await get_anthropic().messages.parse(
+        return await get_backend().parse(
             model=settings.agent_model,
-            max_tokens=1000,
             system=JUDGE_SYSTEM,
-            messages=[{"role": "user", "content": prompt}],
-            output_format=Judgement,
+            user=prompt,
+            schema=Judgement,
+            max_tokens=1000,
             # Grading is a bounded comparison against a written rubric, so the
             # extra spend of a higher effort level buys nothing measurable.
-            output_config={"effort": "low"},
+            effort="low",
         )
-    except anthropic.APIError:
+    except ModelError:
         logger.warning("judge call failed", exc_info=True)
         return None
-
-    return response.parsed_output
+    except Exception:
+        logger.warning("judge output did not parse", exc_info=True)
+        return None

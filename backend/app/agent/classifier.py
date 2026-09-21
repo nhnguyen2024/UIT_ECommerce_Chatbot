@@ -23,10 +23,9 @@ from __future__ import annotations
 import logging
 from typing import Literal
 
-import anthropic
 from pydantic import BaseModel, Field
 
-from app.agent.client import get_anthropic
+from app.agent.llm import ModelError, get_backend
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -120,20 +119,27 @@ async def classify_turn(
     )
 
     try:
-        response = await get_anthropic().messages.parse(
+        parsed = await get_backend().parse(
             model=settings.classifier_model,
-            max_tokens=256,
             system=CLASSIFIER_PROMPT,
-            messages=[{"role": "user", "content": user_content}],
-            output_format=TurnClassification,
+            user=user_content,
+            schema=TurnClassification,
+            max_tokens=256,
+            # Labelling one message needs no deliberation, and this runs on
+            # every turn, so it asks for the least reasoning the provider allows.
+            effort="minimal",
         )
-    except anthropic.APIError:
+    except ModelError:
         # Network trouble, rate limit, or a malformed response. The turn goes
         # ahead with defaults rather than failing in front of the shopper.
         logger.warning("turn classification failed; falling back to defaults", exc_info=True)
         return DEFAULT
+    except Exception:
+        # A response that does not validate against the schema raises here
+        # rather than returning None. Same policy: never fail the turn for it.
+        logger.warning("classifier output did not parse; falling back to defaults", exc_info=True)
+        return DEFAULT
 
-    parsed = response.parsed_output
     if parsed is None:
         logger.warning("classifier returned no parsed output; falling back to defaults")
         return DEFAULT

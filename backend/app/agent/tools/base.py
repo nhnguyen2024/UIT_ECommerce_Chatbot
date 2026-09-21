@@ -57,19 +57,26 @@ class ToolSpec:
     input_schema: dict
     handler: Handler
 
-    def to_anthropic(self) -> dict:
+    def to_anthropic(self, *, strict: bool = True) -> dict:
         """Render the definition sent in the `tools` array.
 
         `strict` plus `additionalProperties: false` guarantees the arguments
         validate against the schema, so handlers can trust their inputs instead
         of defensively re-checking every field.
+
+        `strict` can be switched off for a provider that rejects it. The schema
+        still carries `additionalProperties: false` and `required`, so the model
+        is still told the exact shape; what is lost is the guarantee, and the
+        orchestrator's TypeError guard around each handler call covers that.
         """
-        return {
+        definition = {
             "name": self.name,
             "description": self.description,
-            "strict": True,
             "input_schema": self.input_schema,
         }
+        if strict:
+            definition["strict"] = True
+        return definition
 
 
 class ToolRegistry:
@@ -84,14 +91,14 @@ class ToolRegistry:
     def get(self, name: str) -> ToolSpec | None:
         return self._tools.get(name)
 
-    def definitions(self) -> list[dict]:
+    def definitions(self, *, strict: bool = True) -> list[dict]:
         """Tool definitions in a stable order.
 
         Order matters for prompt caching: the tools block is rendered before the
         system prompt and messages, so reordering it invalidates the whole cached
         prefix on every request.
         """
-        return [self._tools[name].to_anthropic() for name in sorted(self._tools)]
+        return [self._tools[name].to_anthropic(strict=strict) for name in sorted(self._tools)]
 
     def names(self) -> list[str]:
         return sorted(self._tools)

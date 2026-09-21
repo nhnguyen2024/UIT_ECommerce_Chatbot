@@ -115,6 +115,11 @@ and documentation are English; the two languages appear only as content.
               Automated Embedding via Voyage AI
 ```
 
+Both model calls, the classifier's and the orchestrator's, reach Claude through
+one of two providers: Anthropic's API directly, or Snowflake Cortex. They speak
+the same Messages API, so nothing in the diagram changes between them. The choice
+and its limits are in §9, *Model provider*.
+
 ### Component responsibilities
 
 | Component | Responsibility |
@@ -252,9 +257,13 @@ nested language map, because Atlas Search filters and sorts read them directly.
 `channel` is one of `website`, `shopee`, `lazada`, `tiktok_shop`. It decides
 which policy passage answers a return or refund question, and it is the field the
 dashboard would break operating figures down by. Marketplace
-orders additionally carry `channel_order_code`, indexed unique and **sparse**.
-Website orders have none, and a plain unique index would treat all their missing
-values as one colliding null.
+orders additionally carry `channel_order_code`, indexed unique with a **partial
+filter** on the string type. Website orders store the field as an explicit null,
+and a unique index over those nulls rejects every website order after the first.
+The first version used a *sparse* index, which looks like the right tool and is
+not: sparse skips only documents where the field is absent, not null. No unit
+test could catch that; the first seed against a real cluster did, and a
+regression test now pins the partial filter.
 
 ### One embedded field per document
 
@@ -474,7 +483,7 @@ prompt states that any instruction appearing inside them is ordinary text.
 
 ### Prompt caching
 
-The system prompt (5,379 characters) and the six tool definitions do not change
+The system prompt (6,033 characters) and the six tool definitions do not change
 between turns, so a cache breakpoint sits at the end of the system block. Tools
 render before the system prompt in the cached prefix, so one breakpoint covers
 everything stable.
@@ -486,11 +495,95 @@ rate specifically so this failure is visible.
 
 ### Model tiering
 
-| Task | Model | Why |
+Which model does what depends on the provider (§9, *Model provider*):
+
+| Task | Anthropic / Cortex | Azure OpenAI (in use) | Why |
+|---|---|---|---|
+| Turn classification | `claude-haiku-4-5` | `gpt-5-mini`, minimal reasoning | Bounded labelling, runs on every turn |
+| Agent | `claude-opus-5` | `gpt-5-mini`, medium effort | Tool selection and grounded synthesis |
+| Rubric judging | `claude-opus-5`, low effort | `gpt-5-mini`, low effort | A weak judge mistakes fluent wrong answers for correct ones |
+
+On Azure one model fills every role because the student subscription has quota
+for no stronger one (§9, *Model provider*). Tiering survives as effort levels
+rather than as separate models.
+
+### Model provider
+
+The model is reached through one of three providers, chosen by `LLM_PROVIDER`:
+
+| Provider | Wire format | Billed as | Status |
+|---|---|---|---|
+| `anthropic` | Anthropic Messages API | Anthropic API usage | Supported; the code default |
+| `cortex` | Anthropic Messages API, via Snowflake Cortex | Snowflake credits | Supported; **unavailable on trial accounts** |
+| `azure_openai` | OpenAI Chat Completions, via Azure OpenAI v1 | Azure usage | **In use:** `gpt-5-mini` |
+
+**The deciding constraint was billing, not capability.** The project runs on an
+Azure for Students subscription with a $100 credit and no card, and the choice
+went through three stages, each ended by a verified fact rather than a
+preference:
+
+1. *Claude on Azure (Microsoft Foundry).* Microsoft's deployment guide excludes
+   subscriptions without a pay-as-you-go billing method, naming student and
+   credit-only accounts, so the student credit cannot pay for Claude at all.
+2. *Claude through Snowflake Cortex*, paid from Snowflake trial credits. The
+   integration was built and the credentials provisioned, and every Cortex call
+   then returned `403 / 003001, "This account is not allowed to access this
+   endpoint"`. Running the SQL equivalent in the same account gave the cause
+   plainly: *"AI function COMPLETE is not available for trial accounts."*
+   Snowflake's REST API documentation does not mention this.
+3. *Azure's own models (Azure OpenAI)*, which are billed as ordinary Azure usage.
+   Before any code was written, the subscription's quota was listed region by
+   region: across all GPT models, only `gpt-5-mini` (500K tokens a minute) and
+   `o4-mini` have any GlobalStandard quota, in Japan East and Korea Central.
+   `gpt-5-mini` is deployed in Japan East at 100K tokens and 100 requests a
+   minute, priced at $0.25 input and $2.00 output per million tokens.
+
+The cost of that path is model strength. `gpt-5-mini` is a smaller model than
+Claude Opus 5, and the system prompt and tool descriptions were written for
+Claude. How much that matters is a question for the evaluation (§10), not for
+assumption.
+
+**One neutral interface, two wire formats.** The agent loop, classifier and
+judge call `app/agent/llm.py`, which offers four operations: stream a round,
+report the tool calls requested, accept tool results, and return
+schema-validated structured output. Each backend keeps its provider's native
+message list between rounds, so nothing is translated back and forth. The
+formats differ in exactly the places that are easy to get wrong:
+
+| Concern | Anthropic | OpenAI Chat Completions |
 |---|---|---|
-| Turn classification | `claude-haiku-4-5` | Bounded labelling, runs on every turn |
-| Agent | `claude-opus-5` | Tool selection and grounded synthesis |
-| Rubric judging | `claude-opus-5` at low effort | A weak judge mistakes fluent wrong answers for correct ones |
+| Tool calls | Complete `tool_use` blocks | JSON argument fragments, reassembled by index |
+| Tool results | `tool_result` blocks in one user message | One `tool` message per call, after the assistant message that made the calls |
+| Failed tool | `is_error: true` | No flag; the payload carries an `error` key |
+| Structured output | `output_config` format | `response_format` JSON schema |
+| Reasoning depth | adaptive thinking + `effort` | `reasoning_effort` |
+| Prompt caching | explicit `cache_control` breakpoint | automatic on long prefixes |
+| Refusal | `stop_reason: refusal` | `refusal` text, or the content filter stopping |
+
+Two details deserve mention. OpenAI's strict tool mode demands that every
+property be required; the product search's filters are genuinely optional, so
+strict is sent only for schemas that qualify, and a mismatched call still
+surfaces as an error the model can read. And arguments cut off by the output
+limit arrive as incomplete JSON; the call is marked malformed and reported back
+to the model rather than run on a guess.
+
+**The probe.** `python -m app.agent.probe` exercises each capability through the
+same interface the app uses: a streamed text round, a full tool round trip
+(call, result, answer), and structured output with the real classifier and judge
+schemas. It also tests the two features that differ between providers, `strict`
+tool schemas and effort, and reports the value for each switch
+(`LLM_STRICT_TOOLS`, `LLM_EFFORT`). It is to the provider what `seed.smoke` is to
+retrieval. On the deployed `gpt-5-mini` every check passes.
+
+**Credentials** are declared `SecretStr` settings, which keeps them out of reprs,
+logs and tracebacks. Declaring them also fixed an older fault: pydantic-settings
+loads `.env` into declared fields only, never into the process environment where
+the Anthropic SDK looked, so a key in `.env` had never reached it during local
+runs. Azure hid the bug by injecting real environment variables.
+
+**Cost estimates** in telemetry use per-provider prices set in `.env`, so they
+track the real Azure bill. Under Cortex they would be the Anthropic list-price
+equivalent, not the Snowflake credits billed.
 
 ### History replay
 
@@ -566,6 +659,7 @@ produces rate limit errors rather than results.
 | Frontend | Azure Static Web Apps (Free) | Static bundle on a CDN |
 | Backend | Azure Container Apps | Scales to zero, streams without buffering |
 | Database | MongoDB Atlas M0 (Free) | Documents, vectors, and telemetry in one place |
+| Model | Azure OpenAI `gpt-5-mini`, Japan East | See §9, *Model provider* |
 
 Container Apps rather than App Service or Functions for three specific reasons:
 it scales to zero so an idle demonstration costs nothing; it streams
@@ -581,7 +675,18 @@ the backend, so no hostname is compiled into the bundle and the same build works
 in development and production.
 
 Secrets are Container Apps secrets referenced by `secretref:`, never baked into
-the image.
+the image. The deploy script reads `LLM_PROVIDER` and sends only the credential
+that provider needs.
+
+For Cortex, `infra/snowflake/setup.sql` creates the credential once. The backend
+never signs in as a person: it authenticates as `CHATBOT_SVC`, a service user with
+no password, whose token is restricted to a role granting nothing but the right to
+call Cortex models. A leaked token can spend credits; it cannot read or change
+data. Two defaults in Snowflake would otherwise have broken the demonstration.
+Tokens expire after 15 days, shorter than the 30-day trial, so the script sets 45.
+And a token only works for a user under a network policy, while neither Container
+Apps nor a developer laptop has a fixed outbound address, so the policy admits
+any IPv4 address, the same trade-off made for Atlas network access.
 
 ---
 
@@ -604,6 +709,18 @@ would change where the order rows come from rather than how the assistant
 reasons about them. The ingestion path is what remains untested as a result:
 reconciling exports, handling a platform's status vocabulary, and dealing with
 codes that change after a split shipment.
+
+**The model is smaller than the one the prompts were written for.** The system
+prompt and tool descriptions were developed against Claude, and the deployed
+model is `gpt-5-mini`, chosen because it is the strongest model the student
+subscription has quota for. The evaluation measures the result; a comparison
+against Claude on the same dataset would isolate the model's share of any gap.
+
+**The subscription region list constrains placement.** An Azure for Students
+subscription may deploy only to `koreacentral`, `japanwest`,
+`indonesiacentral`, `japaneast` and `eastasia`. The backend runs in East Asia
+(Hong Kong) and the model in Japan East, because East Asia offers only
+provisioned model capacity.
 
 **Automated Embedding is a public preview feature.** The `explicit` fallback
 exists for this reason but has not been exercised end to end.

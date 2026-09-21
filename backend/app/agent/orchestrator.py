@@ -25,11 +25,9 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator
 
-import anthropic
-
 from app.agent.classifier import classify_turn
-from app.agent.client import get_anthropic
 from app.agent.guardrails import check_citations, check_numeric_grounding, screen_input
+from app.agent.llm import ModelError, RoundResult, ToolCall, ToolOutcome, Usage, get_backend
 from app.agent.prompts import SYSTEM_PROMPT
 from app.agent.tools import ToolContext, registry
 from app.config import get_settings
@@ -46,11 +44,11 @@ class UsageTotals:
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
 
-    def add(self, usage: Any) -> None:
-        self.input_tokens += getattr(usage, "input_tokens", 0) or 0
-        self.output_tokens += getattr(usage, "output_tokens", 0) or 0
-        self.cache_read_tokens += getattr(usage, "cache_read_input_tokens", 0) or 0
-        self.cache_write_tokens += getattr(usage, "cache_creation_input_tokens", 0) or 0
+    def add(self, usage: Usage) -> None:
+        self.input_tokens += usage.input_tokens
+        self.output_tokens += usage.output_tokens
+        self.cache_read_tokens += usage.cache_read_tokens
+        self.cache_write_tokens += usage.cache_write_tokens
 
     def cost_usd(self) -> float:
         settings = get_settings()
@@ -88,23 +86,6 @@ class TurnState:
     error: str | None = None
 
 
-def build_system_blocks() -> list[dict]:
-    """System prompt with a cache breakpoint at the end.
-
-    Tools render before the system prompt in the cached prefix, and both are
-    stable across requests, so one breakpoint here covers everything that does
-    not change between turns. Nothing volatile may be added before this point or
-    the cache is invalidated for every conversation at once.
-    """
-    return [
-        {
-            "type": "text",
-            "text": SYSTEM_PROMPT,
-            "cache_control": {"type": "ephemeral"},
-        }
-    ]
-
-
 def build_messages(history: list[dict], user_message: str) -> list[dict]:
     """Replay prior turns as plain text.
 
@@ -136,7 +117,8 @@ async def _execute_tool(name: str, arguments: dict, context: ToolContext) -> tup
         result = await spec.handler(context=context, **arguments)
     except TypeError:
         # Arguments did not match the handler signature. With strict schemas this
-        # should be unreachable, so it signals a schema and handler mismatch.
+        # is unreachable; without them (see openai_strict_compatible in llm.py)
+        # it is the guard that turns a bad call into an error the model can read.
         logger.exception("tool %s rejected its arguments", name)
         return {"error": f"Tool {name!r} could not be called with those arguments."}, True, [], []
     except Exception:
@@ -144,6 +126,15 @@ async def _execute_tool(name: str, arguments: dict, context: ToolContext) -> tup
         return {"error": f"Tool {name!r} failed. Do not retry it this turn."}, True, [], []
 
     return result.data, result.is_error, result.sources, result.products
+
+
+async def _run_call(call: ToolCall, context: ToolContext) -> tuple[Any, bool, list[str], list[dict]]:
+    if call.malformed:
+        # Arguments that were not valid JSON, usually cut off by the output
+        # limit. Running the tool on a guess could answer the wrong question;
+        # telling the model lets it call again properly.
+        return {"error": f"The arguments for {call.name!r} were not valid JSON. Call it again."}, True, [], []
+    return await _execute_tool(call.name, call.arguments, context)
 
 
 async def run_turn(
@@ -196,35 +187,31 @@ async def run_turn(
 
     # --- Model and tool loop ------------------------------------------------
     context = ToolContext(session_id=session_id, lang=state.lang)  # type: ignore[arg-type]
-    messages = build_messages(history, user_message)
-    tools = registry.definitions()
+    conversation = get_backend().conversation(
+        system=SYSTEM_PROMPT,
+        messages=build_messages(history, user_message),
+        tools=registry.definitions(strict=settings.llm_strict_tools),
+        effort=settings.agent_effort,  # type: ignore[arg-type]
+    )
     answer_parts: list[str] = []
 
     try:
         for round_index in range(settings.max_tool_rounds):
             state.tool_rounds = round_index + 1
 
-            async with get_anthropic().messages.stream(
-                model=settings.agent_model,
-                max_tokens=8000,
-                system=build_system_blocks(),
-                messages=messages,
-                tools=tools,
-                thinking={"type": "adaptive"},
-                output_config={"effort": settings.agent_effort},
-            ) as stream:
-                async for event in stream:
-                    if event.type == "content_block_delta" and event.delta.type == "text_delta":
-                        answer_parts.append(event.delta.text)
-                        yield {"type": "text", "delta": event.delta.text}
+            result: RoundResult | None = None
+            async for item in conversation.stream_round():
+                if isinstance(item, RoundResult):
+                    result = item
+                else:
+                    answer_parts.append(item)
+                    yield {"type": "text", "delta": item}
+            assert result is not None, "stream_round must end with a RoundResult"
 
-                response = await stream.get_final_message()
+            state.usage.add(result.usage)
 
-            state.usage.add(response.usage)
-
-            if response.stop_reason == "refusal":
-                detail = getattr(response, "stop_details", None)
-                state.error = f"refusal:{getattr(detail, 'category', None)}"
+            if result.refused:
+                state.error = f"refusal:{result.refusal_detail}"
                 yield {
                     "type": "error",
                     "message": "The assistant declined to answer this request.",
@@ -234,60 +221,47 @@ async def run_turn(
                 )
                 return
 
-            tool_uses = [block for block in response.content if block.type == "tool_use"]
-            if not tool_uses:
+            if not result.tool_calls:
                 break
 
-            messages.append({"role": "assistant", "content": response.content})
+            for call in result.tool_calls:
+                yield {"type": "tool_start", "name": call.name, "input": call.arguments}
 
-            for block in tool_uses:
-                yield {"type": "tool_start", "name": block.name, "input": block.input}
-
-            # Tools in one assistant message are independent, so they run
-            # concurrently. Every result must go back in a single user message:
-            # splitting them teaches the model to stop calling tools in parallel.
+            # Tools in one round are independent, so they run concurrently.
             results = await asyncio.gather(
-                *(_execute_tool(block.name, dict(block.input), context) for block in tool_uses)
+                *(_run_call(call, context) for call in result.tool_calls)
             )
 
-            tool_result_blocks = []
-            for block, (payload, is_error, sources, products) in zip(tool_uses, results):
-                state.tools_used.append(block.name)
+            outcomes: list[ToolOutcome] = []
+            for call, (payload, is_error, sources, products) in zip(result.tool_calls, results):
+                state.tools_used.append(call.name)
                 state.sources.update(sources)
                 for source in sources:
                     if source not in state.retrieved:
                         state.retrieved.append(source)
                 state.tool_payloads.append(payload)
                 state.products.extend(products)
-                if block.name == "create_handoff" and not is_error:
+                if call.name == "create_handoff" and not is_error:
                     state.escalated = True
 
-                tool_result_blocks.append(
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": json.dumps(payload, ensure_ascii=False, default=str),
-                        "is_error": is_error,
-                    }
+                outcomes.append(
+                    ToolOutcome(
+                        call=call,
+                        content=json.dumps(payload, ensure_ascii=False, default=str),
+                        is_error=is_error,
+                    )
                 )
-                yield {"type": "tool_end", "name": block.name, "ok": not is_error}
+                yield {"type": "tool_end", "name": call.name, "ok": not is_error}
 
-            messages.append({"role": "user", "content": tool_result_blocks})
+            conversation.add_tool_results(outcomes)
         else:
             # Loop ran to its bound without the model settling on an answer.
             logger.warning("turn hit the tool round limit for session %s", session_id)
             state.error = "tool_round_limit"
 
-    except anthropic.APIStatusError as exc:
-        logger.exception("Anthropic API error during turn")
-        state.error = f"api_error:{exc.status_code}"
-        yield {"type": "error", "message": "The assistant is unavailable right now."}
-        yield _done_event(text="".join(answer_parts), citations=[], state=state, started=started)
-        return
-    except anthropic.APIConnectionError:
-        logger.exception("Anthropic connection error during turn")
-        state.error = "connection_error"
-        yield {"type": "error", "message": "The assistant is unreachable right now."}
+    except ModelError as exc:
+        state.error = exc.code
+        yield {"type": "error", "message": exc.user_message}
         yield _done_event(text="".join(answer_parts), citations=[], state=state, started=started)
         return
 

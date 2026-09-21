@@ -37,8 +37,9 @@ Angular 22 SPA  (Azure Static Web Apps)
       |  HTTPS, Server-Sent Events
       v
 FastAPI  (Azure Container Apps)
-      |- Turn classifier      claude-haiku-4-5
-      |- Agent orchestrator   claude-opus-5, hand-written tool loop
+      |- Turn classifier      gpt-5-mini, minimal reasoning
+      |- Agent orchestrator   gpt-5-mini, hand-written tool loop
+      |     '- Azure OpenAI (in use), Anthropic, or Snowflake Cortex (LLM_PROVIDER)
       |- Six tools over MongoDB
       |- Guardrails and groundedness checks
       '- Telemetry
@@ -58,6 +59,8 @@ MongoDB Atlas M0  (Automated Embedding, Voyage AI)
 **Policy answers are never generated from model memory.** Return windows and fee thresholds are business facts that change. The model must retrieve a passage and cite its `chunk_id`.
 
 **Policy chunks are split by hand-authored section, not by token count.** A token-based chunker renumbers chunks whenever text is edited, which would rot every citation in the evaluation dataset.
+
+**The model provider is pluggable.** `LLM_PROVIDER=azure_openai` (in use) calls a `gpt-5-mini` deployment on Azure OpenAI, paid from the Azure for Students credit; `anthropic` calls Claude directly; `cortex` calls Claude through Snowflake Cortex. The agent loop, classifier and judge talk to one provider-neutral interface in `app/agent/llm.py`, which translates between Anthropic's and OpenAI's tool-calling formats. Claude on Azure is closed to student subscriptions, and Cortex's language model is closed to Snowflake trials; both were verified, and `docs/architecture.md` §9 records how. `python -m app.agent.probe` checks a provider end to end, including a full tool round trip, before any shopper depends on it.
 
 **Embedding is pluggable.** `EMBEDDING_MODE=auto` lets Atlas generate and sync Voyage vectors. `explicit` computes them in this codebase instead. Automated Embedding is in public preview, and this switch is the fallback. Query code is identical either way.
 
@@ -95,7 +98,7 @@ Requires Python 3.12 or later and a MongoDB Atlas cluster.
 cd backend
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
-cp .env.example .env      # then fill in ANTHROPIC_API_KEY and MONGODB_URI
+cp .env.example .env      # then set MONGODB_URI and the model provider's credentials
 ```
 
 ### Creating the Atlas cluster
@@ -156,6 +159,16 @@ docker run --env-file .env -p 8000:8000 uit-ecommerce-chatbot-backend
 
 The container listens on port 8000 and exposes the same `/health` and `/ready`
 probes used by the local server.
+
+### Checking the model provider
+
+Whichever provider `.env` selects, check it before anything else:
+
+```bash
+.venv/bin/python -m app.agent.probe
+```
+
+It runs a streamed round, a full tool round trip, and structured output with the real classifier and judge schemas, and prints the `LLM_STRICT_TOOLS` and `LLM_EFFORT` values to put in `.env`. For `LLM_PROVIDER=cortex`, first run [infra/snowflake/setup.sql](infra/snowflake/setup.sql) once in a Snowsight worksheet (a paid Snowflake account is required).
 
 ### Verifying retrieval without the model
 

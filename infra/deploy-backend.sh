@@ -42,13 +42,89 @@ read_env() {
   grep -E "^$1=" "$ENV_FILE" | head -1 | cut -d= -f2- | sed 's/^"//; s/"$//'
 }
 
-ANTHROPIC_API_KEY="$(read_env ANTHROPIC_API_KEY)"
-MONGODB_URI="$(read_env MONGODB_URI)"
+require() {
+  # Missing and left-as-template values both count as unset: deploying the
+  # placeholder from .env.example would only fail later, on the first chat turn.
+  local name="$1" value="$2"
+  if [[ -z "$value" || "$value" == *"..."* || "$value" == *"ORGNAME-ACCOUNTNAME"* ]]; then
+    echo "$name must be set in $ENV_FILE" >&2
+    exit 1
+  fi
+}
 
-if [[ -z "$ANTHROPIC_API_KEY" || -z "$MONGODB_URI" ]]; then
-  echo "ANTHROPIC_API_KEY and MONGODB_URI must both be set in $ENV_FILE" >&2
-  exit 1
-fi
+MONGODB_URI="$(read_env MONGODB_URI)"
+require MONGODB_URI "$MONGODB_URI"
+
+# `|| true` because read_env fails when a key is absent, and under set -e that
+# would end the script silently for an older .env written before this setting.
+LLM_PROVIDER="$(read_env LLM_PROVIDER || true)"
+LLM_PROVIDER="${LLM_PROVIDER:-anthropic}"
+
+# Secrets go in as Container Apps secrets and reach the app only through
+# secretref, so they never appear in the app's plain environment configuration.
+SECRETS=("mongodb-uri=$MONGODB_URI")
+PROVIDER_ENV=("LLM_PROVIDER=$LLM_PROVIDER")
+
+case "$LLM_PROVIDER" in
+  anthropic)
+    ANTHROPIC_API_KEY="$(read_env ANTHROPIC_API_KEY)"
+    require ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY"
+    SECRETS+=("anthropic-key=$ANTHROPIC_API_KEY")
+    PROVIDER_ENV+=("ANTHROPIC_API_KEY=secretref:anthropic-key")
+    ;;
+  cortex)
+    SNOWFLAKE_ACCOUNT_URL="$(read_env SNOWFLAKE_ACCOUNT_URL)"
+    SNOWFLAKE_PAT="$(read_env SNOWFLAKE_PAT)"
+    require SNOWFLAKE_ACCOUNT_URL "$SNOWFLAKE_ACCOUNT_URL"
+    require SNOWFLAKE_PAT "$SNOWFLAKE_PAT"
+    SECRETS+=("snowflake-pat=$SNOWFLAKE_PAT")
+    PROVIDER_ENV+=(
+      "SNOWFLAKE_ACCOUNT_URL=$SNOWFLAKE_ACCOUNT_URL"
+      "SNOWFLAKE_PAT=secretref:snowflake-pat"
+    )
+    ;;
+  azure_openai)
+    AZURE_OPENAI_ENDPOINT="$(read_env AZURE_OPENAI_ENDPOINT)"
+    AZURE_OPENAI_API_KEY="$(read_env AZURE_OPENAI_API_KEY)"
+    require AZURE_OPENAI_ENDPOINT "$AZURE_OPENAI_ENDPOINT"
+    require AZURE_OPENAI_API_KEY "$AZURE_OPENAI_API_KEY"
+    if [[ "$AZURE_OPENAI_ENDPOINT" == *"RESOURCE.openai.azure.com"* ]]; then
+      echo "AZURE_OPENAI_ENDPOINT must be set in $ENV_FILE" >&2
+      exit 1
+    fi
+    SECRETS+=("azure-openai-key=$AZURE_OPENAI_API_KEY")
+    PROVIDER_ENV+=(
+      "AZURE_OPENAI_ENDPOINT=$AZURE_OPENAI_ENDPOINT"
+      "AZURE_OPENAI_API_KEY=secretref:azure-openai-key"
+    )
+    ;;
+  *)
+    echo "LLM_PROVIDER must be anthropic, cortex or azure_openai, not '$LLM_PROVIDER'" >&2
+    exit 1
+    ;;
+esac
+
+# Model names, effort and prices follow .env, because they differ by provider:
+# for Azure OpenAI the model names are deployment names. Hard-coding them here
+# once deployed Claude model names against an Azure endpoint. Absent values
+# fall back to the app's own defaults by simply not being set.
+for NAME in AGENT_MODEL CLASSIFIER_MODEL AGENT_EFFORT \
+            PRICE_INPUT_PER_MTOK PRICE_OUTPUT_PER_MTOK PRICE_CACHE_READ_PER_MTOK; do
+  VALUE="$(read_env "$NAME" || true)"
+  if [[ -n "$VALUE" ]]; then
+    PROVIDER_ENV+=("$NAME=$VALUE")
+  fi
+done
+
+# Whatever app.agent.probe reported for this provider, carried over unchanged.
+# Absent means true, matching the app's own default; an empty string would not
+# parse as a boolean and the app would refuse to start.
+LLM_STRICT_TOOLS="$(read_env LLM_STRICT_TOOLS || true)"
+LLM_EFFORT="$(read_env LLM_EFFORT || true)"
+PROVIDER_ENV+=(
+  "LLM_STRICT_TOOLS=${LLM_STRICT_TOOLS:-true}"
+  "LLM_EFFORT=${LLM_EFFORT:-true}"
+)
 
 echo "==> Resource group"
 az group create --name "$RESOURCE_GROUP" --location "$LOCATION" --output none
@@ -96,14 +172,12 @@ az containerapp create \
   --min-replicas 0 \
   --max-replicas 2 \
   --cpu 0.5 --memory 1.0Gi \
-  --secrets "anthropic-key=$ANTHROPIC_API_KEY" "mongodb-uri=$MONGODB_URI" \
+  --secrets "${SECRETS[@]}" \
   --env-vars \
-    "ANTHROPIC_API_KEY=secretref:anthropic-key" \
+    "${PROVIDER_ENV[@]}" \
     "MONGODB_URI=secretref:mongodb-uri" \
     "MONGODB_DB=uit_ecommerce_chatbot" \
     "EMBEDDING_MODE=auto" \
-    "AGENT_MODEL=claude-opus-5" \
-    "CLASSIFIER_MODEL=claude-haiku-4-5" \
   --output none
 
 FQDN="$(az containerapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" \

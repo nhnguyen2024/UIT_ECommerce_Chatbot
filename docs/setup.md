@@ -35,8 +35,52 @@ cd backend
 cp .env.example .env
 ```
 
-Edit `.env` and set `ANTHROPIC_API_KEY` and `MONGODB_URI`. Leave
-`EMBEDDING_MODE=auto` so Atlas generates the vectors.
+Edit `.env` and set `MONGODB_URI`. Leave `EMBEDDING_MODE=auto` so Atlas
+generates the vectors.
+
+Then choose the model provider, with `LLM_PROVIDER`:
+
+- **`azure_openai`** (what this project uses): a `gpt-5-mini` deployment, paid
+  from Azure credit, including an Azure for Students subscription.
+  1. Pick a region your subscription allows **and** that has GlobalStandard
+     quota for the model. Check with
+     `az cognitiveservices usage list -l <region>`. On the student subscription
+     used here, that meant `japaneast` or `koreacentral`.
+  2. Create the resource and the deployment:
+     ```bash
+     az group create -n rg-uit-chatbot -l eastasia
+     az cognitiveservices account create -n <name> -g rg-uit-chatbot -l japaneast \
+       --kind AIServices --sku S0 --custom-domain <name> --yes
+     az cognitiveservices account deployment create -g rg-uit-chatbot -n <name> \
+       --deployment-name gpt-5-mini --model-name gpt-5-mini --model-version 2025-08-07 \
+       --model-format OpenAI --sku-name GlobalStandard --sku-capacity 100
+     ```
+     Capacity 100 is 100K tokens and 100 requests a minute.
+  3. In `.env` set `AZURE_OPENAI_ENDPOINT=https://<name>.openai.azure.com`,
+     `AZURE_OPENAI_API_KEY` (from `az cognitiveservices account keys list`),
+     `AGENT_MODEL=gpt-5-mini`, `CLASSIFIER_MODEL=gpt-5-mini`,
+     `AGENT_EFFORT=medium`, and the three `PRICE_*` values noted in `.env.example`.
+- **`anthropic`**: set `ANTHROPIC_API_KEY` from
+  [console.anthropic.com](https://console.anthropic.com).
+- **`cortex`**: calls Claude through Snowflake Cortex, billed in Snowflake credits.
+  **Not available on a Snowflake trial**, which blocks the COMPLETE function.
+  1. Use a paid Snowflake account.
+  2. Open a SQL worksheet in Snowsight, paste in
+     [infra/snowflake/setup.sql](../infra/snowflake/setup.sql), and run all of it.
+     It enables cross-region inference, creates a service user that can only
+     call Cortex, and prints a token that is valid for 45 days.
+  3. Copy the `TOKEN_SECRET` value into `SNOWFLAKE_PAT`. It is shown only once.
+  4. Set `SNOWFLAKE_ACCOUNT_URL` to your account URL, for example
+     `https://myorg-myaccount.snowflakecomputing.com`, with no path.
+
+Check the provider before going further. This needs no database:
+
+```bash
+.venv/bin/python -m app.agent.probe
+```
+
+Every required check must pass. Copy the `LLM_STRICT_TOOLS` and `LLM_EFFORT`
+values it prints into `.env`.
 
 ```bash
 python3 -m venv .venv
