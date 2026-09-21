@@ -6,6 +6,8 @@ import { ChatService, Citation, Product, StreamEvent } from './chat.service';
 interface ToolStep {
   name: string;
   label: string;
+  /** Shown once the step finishes, so a completed lookup stops saying "Đang…". */
+  doneLabel: string;
   done: boolean;
   ok: boolean;
 }
@@ -65,13 +67,33 @@ const SKU_CATEGORIES: Record<string, string> = {
  * nothing to a shopper; "Reading store policies" tells them why they are
  * waiting, which is the entire point of showing progress at all.
  */
-const TOOL_LABELS: Record<string, { vi: string; en: string }> = {
-  search_products: { vi: 'Đang tìm sản phẩm', en: 'Searching products' },
-  get_product_details: { vi: 'Đang xem chi tiết sản phẩm', en: 'Reading product details' },
-  compare_products: { vi: 'Đang so sánh sản phẩm', en: 'Comparing products' },
-  search_policies: { vi: 'Đang tra cứu chính sách', en: 'Reading store policies' },
-  get_order_status: { vi: 'Đang kiểm tra đơn hàng', en: 'Checking your order' },
-  create_handoff: { vi: 'Đang chuyển cho nhân viên', en: 'Connecting you to an agent' },
+type Label = { vi: string; en: string };
+
+const TOOL_LABELS: Record<string, { running: Label; done: Label }> = {
+  search_products: {
+    running: { vi: 'Đang tìm sản phẩm', en: 'Searching products' },
+    done: { vi: 'Đã tìm sản phẩm', en: 'Searched products' },
+  },
+  get_product_details: {
+    running: { vi: 'Đang xem chi tiết sản phẩm', en: 'Reading product details' },
+    done: { vi: 'Đã xem chi tiết sản phẩm', en: 'Read product details' },
+  },
+  compare_products: {
+    running: { vi: 'Đang so sánh sản phẩm', en: 'Comparing products' },
+    done: { vi: 'Đã so sánh sản phẩm', en: 'Compared products' },
+  },
+  search_policies: {
+    running: { vi: 'Đang tra cứu chính sách', en: 'Reading store policies' },
+    done: { vi: 'Đã tra cứu chính sách', en: 'Read store policies' },
+  },
+  get_order_status: {
+    running: { vi: 'Đang kiểm tra đơn hàng', en: 'Checking your order' },
+    done: { vi: 'Đã kiểm tra đơn hàng', en: 'Checked your order' },
+  },
+  create_handoff: {
+    running: { vi: 'Đang chuyển cho nhân viên', en: 'Connecting you to an agent' },
+    done: { vi: 'Đã chuyển cho nhân viên', en: 'Passed to an agent' },
+  },
 };
 
 const SUGGESTIONS = [
@@ -196,7 +218,7 @@ export class ChatComponent {
           const name = event.name;
           this.patchLast((last) => ({
             ...last,
-            tools: [...(last.tools ?? []), { name, label: this.toolLabel(name), done: false, ok: true }],
+            tools: [...(last.tools ?? []), { name, ...this.toolLabels(name), done: false, ok: true }],
           }));
         }
         break;
@@ -246,16 +268,33 @@ export class ChatComponent {
     );
   }
 
-  private toolLabel(name: string): string {
+  private toolLabels(name: string): { label: string; doneLabel: string } {
     const entry = TOOL_LABELS[name];
-    if (!entry) return name.replace(/_/g, ' ');
-    return this.lang() === 'vi' ? entry.vi : entry.en;
+    if (!entry) {
+      const plain = name.replace(/_/g, ' ');
+      return { label: plain, doneLabel: plain };
+    }
+    const lang = this.lang();
+    return { label: entry.running[lang], doneLabel: entry.done[lang] };
   }
 
   /** Which tools ran, for the collapsed trace under a finished reply. */
   toolSummary(tools: ToolStep[] | undefined): string {
     if (!tools?.length) return '';
     return [...new Set(tools.map((step) => step.name.replace(/_/g, ' ')))].join(' · ');
+  }
+
+  /**
+   * The reply without its [ref:...] markers.
+   *
+   * The markers are for the backend's citation check; the sources already show
+   * as chips under the reply. A marker still being streamed ("[ref:retu") is cut
+   * too, so it never flashes on screen before it is complete.
+   */
+  displayText(text: string): string {
+    return text
+      .replace(/[ \t]*\[ref:[^\]\s]+\]/g, '')
+      .replace(/[ \t]*\[(r(e(f(:[^\]\s]*)?)?)?)?$/, '');
   }
 
   citationLabel(citation: Citation): string {

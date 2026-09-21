@@ -31,7 +31,7 @@
                 @for (step of message.tools; track $index) {
                   <li [class.done]="step.done" [class.failed]="!step.ok">
                     <span class="tick" aria-hidden="true"></span>
-                    {{ step.label }}
+                    {{ step.done ? step.doneLabel : step.label }}
                   </li>
                 }
               </ul>
@@ -39,7 +39,7 @@
           }
 
           @if (message.text) {
-            <p class="body">{{ message.text }}<span class="caret" [class.on]="message.pending"></span></p>
+            <p class="body">{{ displayText(message.text) }}<span class="caret" [class.on]="message.pending"></span></p>
           } @else if (message.pending && !message.tools?.length) {
             <p class="body"><span class="caret on"></span></p>
           }
