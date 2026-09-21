@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ChatService, Citation, Product, StreamEvent } from './chat.service';
+import { OrderMapComponent, Tracking } from './order-map.component';
 
 /** A tool call, as the shopper sees it. */
 interface ToolStep {
@@ -17,6 +18,7 @@ interface Message {
   text: string;
   citations?: Citation[];
   products?: Product[];
+  tracking?: Tracking[];
   tools?: ToolStep[];
   pending?: boolean;
 }
@@ -106,7 +108,7 @@ const SUGGESTIONS = [
 @Component({
   selector: 'app-chat',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, OrderMapComponent],
   templateUrl: './chat.component.html',
   styleUrl: './chat.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -137,6 +139,7 @@ export class ChatComponent {
                 text: message.text,
                 citations: message.citations,
                 products: message.products,
+                tracking: message.tracking,
               })),
             );
           }
@@ -239,6 +242,10 @@ export class ChatComponent {
 
       case 'products':
         this.patchLast((last) => ({ ...last, products: event.items as Product[] }));
+        break;
+
+      case 'tracking':
+        this.patchLast((last) => ({ ...last, tracking: event.items as Tracking[] }));
         break;
 
       case 'citations':

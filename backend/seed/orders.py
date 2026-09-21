@@ -20,7 +20,8 @@ from __future__ import annotations
 import random
 from datetime import datetime, timedelta, timezone
 
-from app.db.schema import Channel, Order, OrderItem, OrderTimelineEntry
+from app.db.schema import Channel, Order, OrderItem, OrderTimelineEntry, RouteStop
+from app.geo import DESTINATIONS, PLACES, plan_route
 from app.security import hash_email, hash_phone, normalize_phone
 from seed.catalog import generate_products
 
@@ -115,6 +116,66 @@ def _build_timeline(status: str, created_at: datetime, rng: random.Random) -> li
     return entries
 
 
+# Big cities get most parcels, as they would for a real electronics seller.
+DESTINATION_WEIGHTS = {"hcm": 22, "hanoi": 20, "danang": 6, "haiphong": 5, "cantho": 4, "dongnai": 4}
+
+# Statuses at which the parcel has left the warehouse.
+LEFT_WAREHOUSE = {"shipped", "out_for_delivery", "delivered", "returned"}
+
+
+def _pick_destination(rng: random.Random) -> str:
+    weights = [DESTINATION_WEIGHTS.get(key, 2) for key in DESTINATIONS]
+    return rng.choices(DESTINATIONS, weights=weights)[0]
+
+
+def _pick_warehouse(destination: str, rng: random.Random) -> str:
+    region = PLACES[destination].region
+    if region == "north":
+        return "wh-hanoi"
+    if region == "south":
+        return "wh-hcm"
+    return rng.choice(["wh-hanoi", "wh-hcm"])
+
+
+def _build_route(
+    status: str,
+    timeline: list[OrderTimelineEntry],
+    warehouse: str,
+    destination: str,
+    rng: random.Random,
+) -> list[RouteStop]:
+    """Arrival times along the route, consistent with the status timeline.
+
+    The warehouse is reached when the order is placed. Hubs are reached after
+    the carrier takes the parcel and before it goes out for delivery; the
+    destination only once delivered. A parcel still "shipped" has reached only
+    the hubs whose arrival time is already in the past at NOW.
+    """
+    places = plan_route(warehouse, destination)
+    at = {entry.status: entry.at for entry in timeline}
+    stops = [RouteStop(place=places[0], arrived_at=timeline[0].at)]
+    hubs, final = places[1:-1], places[-1]
+
+    if status not in LEFT_WAREHOUSE:
+        return stops + [RouteStop(place=place) for place in places[1:]]
+
+    shipped_at = at["shipped"]
+    if "out_for_delivery" in at:
+        # Spread the hubs evenly between hand-over and the last-mile start.
+        span = at["out_for_delivery"] - shipped_at
+        for index, place in enumerate(hubs):
+            stops.append(RouteStop(place=place, arrived_at=shipped_at + span * (index + 1) / (len(hubs) + 1)))
+    else:
+        arrival = shipped_at
+        for place in hubs:
+            arrival = arrival + timedelta(hours=rng.randint(6, 18))
+            stops.append(RouteStop(place=place, arrived_at=arrival if arrival <= NOW else None))
+
+    delivered_at = at.get("delivered")
+    stops.append(RouteStop(place=final, arrived_at=delivered_at))
+    return stops
+
+
 def _make_name(rng: random.Random) -> str:
     return f"{rng.choice(FAMILY_NAMES)} {rng.choice(MIDDLE_NAMES)} {rng.choice(GIVEN_NAMES)}"
 
@@ -138,6 +199,8 @@ def _build_order(
     status: str,
     created_at: datetime,
     rng: random.Random,
+    destination: str | None = None,
+    warehouse: str | None = None,
 ) -> Order:
     subtotal = sum(item.unit_price * item.quantity for item in items)
     shipping_fee = _shipping_fee(subtotal, rng)
@@ -154,6 +217,13 @@ def _build_order(
         estimated_delivery = timeline[-1].at + timedelta(days=rng.randint(1, 4))
 
     normalized_phone = normalize_phone(phone)
+
+    # Its own generator, seeded by the order code, so adding routes did not
+    # shift a single value the main generator produces for existing orders.
+    geo_rng = random.Random(f"route:{order_code}")
+    destination = destination or _pick_destination(geo_rng)
+    warehouse = warehouse or _pick_warehouse(destination, geo_rng)
+    route = _build_route(status, timeline, warehouse, destination, geo_rng)
 
     return Order(
         order_code=order_code,
@@ -173,6 +243,8 @@ def _build_order(
         tracking_code=tracking,
         estimated_delivery=estimated_delivery,
         created_at=created_at,
+        destination=destination,
+        route=route,
     )
 
 
@@ -211,6 +283,16 @@ SHOWCASE = [
      ["TVS-000", "ACC-002", "WAT-000"], 1),
 ]
 
+# (warehouse, destination). DH2026090001 crosses the country so the demo map
+# shows every kind of stop: warehouse, three hubs, and the last mile.
+SHOWCASE_ROUTES = {
+    "DH2026090001": ("wh-hcm", "hanoi"),
+    "DH2026090002": ("wh-hanoi", "danang"),
+    "DH2026090003": ("wh-hcm", "cantho"),
+    "DH2026090004": ("wh-hcm", "khanhhoa"),
+    "DH2026090005": ("wh-hanoi", "haiphong"),
+}
+
 SHOWCASE_NAMES = {
     "DH2026090001": "Nguyễn Văn An",
     "DH2026090002": "Trần Thị Bình",
@@ -240,6 +322,8 @@ def generate_orders(bulk_count: int = BULK_COUNT) -> list[Order]:
                 status=status,
                 created_at=NOW - timedelta(days=days_ago),
                 rng=rng,
+                warehouse=SHOWCASE_ROUTES[order_code][0],
+                destination=SHOWCASE_ROUTES[order_code][1],
             )
         )
 

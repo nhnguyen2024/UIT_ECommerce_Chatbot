@@ -38,12 +38,15 @@ class ToolResult:
             "return-policy#refund-timing" or "product:PHN-001".
         products: Product cards for the UI to render. Carried separately from
             `data` so the frontend does not have to parse the model's prose.
+        tracking: A verified order's route, for the UI's tracking map. Same
+            reasoning as `products`; set only after the contact check passed.
         is_error: Marks the tool_result block as an error for the model.
     """
 
     data: Any
     sources: list[str] = field(default_factory=list)
     products: list[dict] = field(default_factory=list)
+    tracking: dict | None = None
     is_error: bool = False
 
 

@@ -1,0 +1,113 @@
+:host { display: block; margin-top: 16px; }
+
+.tracking {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 14px 16px 12px;
+}
+
+.head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.head > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.code { font-family: var(--font-display); font-size: 16px; font-weight: 600; color: var(--ink); }
+.channel { font-size: 12.5px; color: var(--ink-2); }
+
+.status {
+  flex: none;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.status[data-status='shipped'],
+.status[data-status='out_for_delivery'] { color: var(--accent); border-color: var(--accent-dim); background: var(--accent-wash); }
+.status[data-status='delivered'] { color: var(--status-good); border-color: var(--status-good); }
+.status[data-status='cancelled'],
+.status[data-status='returned'] { color: var(--status-warn); border-color: var(--status-warn); }
+
+.body { display: grid; grid-template-columns: minmax(180px, 250px) 1fr; gap: 16px; align-items: start; }
+
+.map {
+  width: 100%;
+  aspect-ratio: 798 / 966;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  display: block;
+}
+.sea { fill: var(--surface-2); }
+.neighbours { fill: var(--surface-hover); stroke: var(--border-strong); stroke-width: 1; opacity: 0.8; }
+.land { fill: var(--accent-wash); stroke: var(--accent-dim); stroke-linejoin: round; }
+:host-context(:root:not([data-theme='light'])) .land { fill: rgba(69, 227, 168, 0.12); }
+.island { fill: var(--accent-dim); }
+.island-label { fill: var(--ink-2); font-family: var(--font-body); }
+
+.leg { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.leg.done { stroke: var(--accent); }
+.leg.ahead { stroke: var(--ink-3); opacity: 0.8; }
+.leg.active { stroke: var(--accent); animation: travel 1.2s linear infinite; }
+@keyframes travel { to { stroke-dashoffset: -60; } }
+
+.marker rect,
+.marker circle:not(.pulse) { fill: var(--surface); stroke: var(--ink-3); }
+.marker[data-state='done'] rect,
+.marker[data-state='done'] circle:not(.pulse) { fill: var(--accent); stroke: var(--accent); }
+.marker[data-state='current'] rect,
+.marker[data-state='current'] circle:not(.pulse) { fill: var(--surface); stroke: var(--accent); }
+.marker[data-state='current'][data-kind='destination'] circle:not(.pulse) { fill: var(--accent); }
+.pulse { fill: var(--accent); opacity: 0.25; transform-box: fill-box; transform-origin: center; animation: pulse 1.8s ease-out infinite; }
+@keyframes pulse { from { transform: scale(0.6); opacity: 0.45; } to { transform: scale(1.8); opacity: 0; } }
+
+.stops { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.stops li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  column-gap: 10px;
+  padding: 0 0 14px;
+}
+.stops li:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 14px;
+  bottom: 0;
+  width: 2px;
+  background: var(--border-strong);
+}
+.stops li[data-state='done']:not(:last-child)::before { background: var(--accent-dim); }
+.dot {
+  grid-row: span 2;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  background: var(--surface);
+  box-sizing: border-box;
+}
+.stops li[data-state='done'] .dot { background: var(--accent-dim); border-color: var(--accent-dim); }
+.stops li[data-state='current'] .dot { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-wash); }
+.place { font-size: 13.5px; color: var(--ink); line-height: 1.35; }
+.stops li[data-state='ahead'] .place { color: var(--ink-2); }
+.time { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
+
+.note { margin: 4px 0 0; font-size: 11.5px; color: var(--ink-3); }
+
+@media (max-width: 560px) {
+  .body { grid-template-columns: 1fr; }
+  .map { max-width: 280px; margin: 0 auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .leg.active, .pulse { animation: none; }
+}

@@ -184,6 +184,17 @@ class OrderTimelineEntry(BaseModel):
     note_en: str
 
 
+class RouteStop(BaseModel):
+    """One place on a parcel's way, keyed into `app.geo.PLACES`.
+
+    `arrived_at` is None for stops still ahead. Carriers report arrivals at
+    named hubs, which is what this records; there is no live courier position.
+    """
+
+    place: str
+    arrived_at: datetime | None = None
+
+
 class Order(BaseModel):
     """An order.
 
@@ -218,6 +229,9 @@ class Order(BaseModel):
     tracking_code: str | None = None
     estimated_delivery: datetime | None = None
     created_at: datetime
+    # Province only, never an address: see app/geo.py.
+    destination: str | None = None
+    route: list[RouteStop] = Field(default_factory=list)
 
 
 # --- Conversations ---------------------------------------------------------
@@ -231,6 +245,7 @@ class StoredMessage(BaseModel):
     blocks: list[dict] = Field(default_factory=list)
     citations: list[dict] = Field(default_factory=list)
     products: list[dict] = Field(default_factory=list)
+    tracking: list[dict] = Field(default_factory=list)
     created_at: datetime
 
 

@@ -59,6 +59,7 @@ async def stream_chat(request: ChatRequest) -> StreamingResponse:
         answer = ""
         citations: list[dict] = []
         products: list[dict] = []
+        tracking: list[dict] = []
         outcome: dict | None = None
 
         try:
@@ -69,6 +70,7 @@ async def stream_chat(request: ChatRequest) -> StreamingResponse:
                     answer = event["text"]
                     citations = event["citations"]
                     products = event["products"]
+                    tracking = event.get("tracking", [])
                     outcome = event["outcome"]
                 yield _sse(event)
         except Exception:
@@ -89,6 +91,7 @@ async def stream_chat(request: ChatRequest) -> StreamingResponse:
                     assistant_text=answer,
                     citations=citations,
                     products=products,
+                    tracking=tracking,
                 )
                 await record_turn(session_id=session_id, outcome=outcome)
             except Exception:

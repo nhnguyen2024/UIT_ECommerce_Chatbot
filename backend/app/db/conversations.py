@@ -70,6 +70,7 @@ async def append_turn(
     assistant_text: str,
     citations: list[dict],
     products: list[dict],
+    tracking: list[dict] | None = None,
 ) -> None:
     """Append one user message and one assistant reply.
 
@@ -87,6 +88,7 @@ async def append_turn(
         text=assistant_text,
         citations=citations,
         products=products,
+        tracking=tracking or [],
         created_at=now,
     ).model_dump()
 

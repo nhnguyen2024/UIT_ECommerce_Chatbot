@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from app.agent.tools.base import ToolContext, ToolResult, tool
 from app.db import schema
 from app.db.client import get_db
+from app.geo import PLACES
 from app.security import contact_matches, mask_phone
 
 HANDOFF_REASONS = [
@@ -129,6 +130,17 @@ async def get_order_status(
 
     estimated = document.get("estimated_delivery")
 
+    # The route: the model gets place names, to answer "where is it now"; the
+    # map gets coordinates as well. Unknown place keys are skipped rather than
+    # failing the lookup, since the order itself is still worth showing.
+    stops = [
+        (PLACES[stop["place"]], stop.get("arrived_at"))
+        for stop in document.get("route", [])
+        if stop.get("place") in PLACES
+    ]
+    reached = [place for place, arrived in stops if arrived is not None]
+    destination = PLACES.get(document.get("destination") or "")
+
     return ToolResult(
         data={
             "verified": True,
@@ -155,10 +167,39 @@ async def get_order_status(
             "tracking_code": document.get("tracking_code"),
             "estimated_delivery": estimated.date().isoformat() if estimated else None,
             "timeline": timeline,
+            # Province only. There is no street address to leak.
+            "destination": destination.name(suffix) if destination else None,
+            "current_location": reached[-1].name(suffix) if reached else None,
+            "route": [
+                {"place": place.name(suffix), "arrived_at": arrived.isoformat() if arrived else None}
+                for place, arrived in stops
+            ],
             "placed_at": document["created_at"].date().isoformat(),
             "source_id": f"order:{document['order_code']}",
         },
         sources=[f"order:{document['order_code']}"],
+        tracking={
+            "order_code": document["order_code"],
+            "channel_label": schema.CHANNEL_LABELS.get(
+                document.get("channel", "website"), "Northlight.vn"
+            ),
+            "status": document["status"],
+            "carrier": document.get("carrier"),
+            "estimated_delivery": estimated.date().isoformat() if estimated else None,
+            "stops": [
+                {
+                    "key": place.key,
+                    "name": place.name(suffix),
+                    "kind": place.kind,
+                    "lat": place.lat,
+                    "lon": place.lon,
+                    "arrived_at": arrived.isoformat() if arrived else None,
+                }
+                for place, arrived in stops
+            ],
+        }
+        if stops
+        else None,
     )
 
 

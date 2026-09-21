@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import type { Tracking } from './order-map.component';
 
 export interface Citation {
   source_id: string;
@@ -40,6 +41,7 @@ export interface StreamEvent {
     | 'tool_start'
     | 'tool_end'
     | 'products'
+    | 'tracking'
     | 'citations'
     | 'done'
     | 'error';
@@ -66,6 +68,7 @@ export interface StoredConversation {
     text: string;
     citations?: Citation[];
     products?: Product[];
+    tracking?: Tracking[];
   }>;
 }
 

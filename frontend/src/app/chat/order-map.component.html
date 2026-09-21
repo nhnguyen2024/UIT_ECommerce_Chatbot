@@ -1,0 +1,82 @@
+<section class="tracking" [attr.aria-label]="t('Hành trình đơn hàng', 'Order journey')">
+  <header class="head">
+    <div>
+      <span class="eyebrow">{{ t('Hành trình đơn hàng', 'Order journey') }}</span>
+      <strong class="code">{{ tracking().order_code }}</strong>
+      <span class="channel">{{ tracking().channel_label }}@if (tracking().carrier) { · {{ tracking().carrier }} }</span>
+    </div>
+    <span class="status" [attr.data-status]="tracking().status">{{ statusLabel() }}</span>
+  </header>
+
+  <div class="body">
+    <svg class="map" [attr.viewBox]="viewBox()" preserveAspectRatio="xMidYMid meet" role="img"
+         [attr.aria-label]="t('Bản đồ hành trình đơn hàng', 'Map of the order route')">
+      <rect class="sea" x="0" y="0" width="100%" height="100%" />
+      <rect class="sea" [attr.x]="-2000" [attr.y]="-2000" width="5000" height="5000" />
+      <path class="neighbours" [attr.d]="neighboursPath" />
+      <path class="land" [attr.d]="vietnamPath" [attr.stroke-width]="unit() * 0.9" />
+
+      @if (fullFrame()) {
+        @for (island of hoangSa; track $index) {
+          <circle class="island" [attr.cx]="island[0]" [attr.cy]="island[1]" [attr.r]="unit() * 1.6" />
+        }
+        @for (island of truongSa; track $index) {
+          <circle class="island" [attr.cx]="island[0]" [attr.cy]="island[1]" [attr.r]="unit() * 1.6" />
+        }
+        <text class="island-label" [attr.x]="hoangSaLabel.x" [attr.y]="hoangSaLabel.y - unit() * 9"
+              [attr.font-size]="unit() * 9" text-anchor="middle">{{ t('QĐ. Hoàng Sa', 'Hoàng Sa Is.') }}</text>
+        <text class="island-label" [attr.x]="truongSaLabel.x" [attr.y]="truongSaLabel.y - unit() * 16"
+              [attr.font-size]="unit() * 9" text-anchor="middle">{{ t('QĐ. Trường Sa', 'Trường Sa Is.') }}</text>
+      }
+
+      <polyline class="leg ahead" [attr.points]="ahead()"
+                [attr.stroke-width]="unit() * 1.6" [attr.stroke-dasharray]="unit() * 3 + ' ' + unit() * 4" />
+      <polyline class="leg done" [attr.points]="travelled()" [attr.stroke-width]="unit() * 2.4" />
+      @if (activeLeg()) {
+        <polyline class="leg active" [attr.points]="activeLeg()"
+                  [attr.stroke-width]="unit() * 2.4" [attr.stroke-dasharray]="unit() * 5 + ' ' + unit() * 4" />
+      }
+
+      @for (marker of markers(); track $index) {
+        <g class="marker" [attr.data-state]="marker.state" [attr.data-kind]="marker.kind">
+          <title>{{ marker.label }}</title>
+          @if (marker.state === 'current' && !delivered()) {
+            <circle class="pulse" [attr.cx]="marker.x" [attr.cy]="marker.y" [attr.r]="unit() * 5" />
+          }
+          @if (marker.kind === 'warehouse') {
+            <rect [attr.x]="marker.x - unit() * 3.6" [attr.y]="marker.y - unit() * 3.6"
+                  [attr.width]="unit() * 7.2" [attr.height]="unit() * 7.2" [attr.rx]="unit() * 1.4"
+                  [attr.stroke-width]="unit() * 1.2" />
+          } @else {
+            <circle [attr.cx]="marker.x" [attr.cy]="marker.y"
+                    [attr.r]="marker.kind === 'destination' ? unit() * 4.4 : unit() * 3.4"
+                    [attr.stroke-width]="unit() * 1.2" />
+          }
+        </g>
+      }
+    </svg>
+
+    <ol class="stops">
+      @for (stop of tracking().stops; track stop.key; let i = $index) {
+        <li [attr.data-state]="i < currentIndex() ? 'done' : i === currentIndex() ? 'current' : 'ahead'">
+          <span class="dot" aria-hidden="true"></span>
+          <span class="place">{{ stop.name }}</span>
+          <span class="time">
+            @if (stop.arrived_at) {
+              {{ when(stop.arrived_at) }}
+            } @else if (stop.kind === 'destination' && tracking().estimated_delivery) {
+              {{ t('Dự kiến', 'Expected') }} {{ day(tracking().estimated_delivery) }}
+            } @else {
+              —
+            }
+          </span>
+        </li>
+      }
+    </ol>
+  </div>
+
+  <p class="note">
+    {{ t('Vị trí cập nhật theo các điểm quét của đơn vị vận chuyển, không phải định vị trực tiếp.',
+         'Positions update at carrier scan points, not live GPS.') }}
+  </p>
+</section>

@@ -85,6 +85,7 @@ class TurnState:
     retrieved: list[str] = field(default_factory=list)
     tool_payloads: list[Any] = field(default_factory=list)
     products: list[dict] = field(default_factory=list)
+    tracking: list[dict] = field(default_factory=list)
     usage: UsageTotals = field(default_factory=UsageTotals)
     escalated: bool = False
     blocked: bool = False
@@ -111,12 +112,16 @@ def build_messages(history: list[dict], user_message: str) -> list[dict]:
     return messages
 
 
-async def _execute_tool(name: str, arguments: dict, context: ToolContext) -> tuple[Any, bool, list[str], list[dict]]:
-    """Run one tool. Returns (payload, is_error, sources, product cards)."""
+# (payload, is_error, sources, product cards, tracking)
+ToolRun = tuple[Any, bool, list[str], list[dict], dict | None]
+
+
+async def _execute_tool(name: str, arguments: dict, context: ToolContext) -> ToolRun:
+    """Run one tool. Returns (payload, is_error, sources, product cards, tracking)."""
     spec = registry.get(name)
     if spec is None:
         # The model can only call tools we defined, so this means a registry bug.
-        return {"error": f"Unknown tool {name!r}."}, True, [], []
+        return {"error": f"Unknown tool {name!r}."}, True, [], [], None
 
     try:
         result = await spec.handler(context=context, **arguments)
@@ -125,21 +130,38 @@ async def _execute_tool(name: str, arguments: dict, context: ToolContext) -> tup
         # is unreachable; without them (see openai_strict_compatible in llm.py)
         # it is the guard that turns a bad call into an error the model can read.
         logger.exception("tool %s rejected its arguments", name)
-        return {"error": f"Tool {name!r} could not be called with those arguments."}, True, [], []
+        return {"error": f"Tool {name!r} could not be called with those arguments."}, True, [], [], None
     except Exception:
         logger.exception("tool %s failed", name)
-        return {"error": f"Tool {name!r} failed. Do not retry it this turn."}, True, [], []
+        return {"error": f"Tool {name!r} failed. Do not retry it this turn."}, True, [], [], None
 
-    return result.data, result.is_error, result.sources, result.products
+    return result.data, result.is_error, result.sources, result.products, result.tracking
 
 
-async def _run_call(call: ToolCall, context: ToolContext) -> tuple[Any, bool, list[str], list[dict]]:
+async def _run_call(call: ToolCall, context: ToolContext) -> ToolRun:
     if call.malformed:
         # Arguments that were not valid JSON, usually cut off by the output
         # limit. Running the tool on a guess could answer the wrong question;
         # telling the model lets it call again properly.
-        return {"error": f"The arguments for {call.name!r} were not valid JSON. Call it again."}, True, [], []
+        return {"error": f"The arguments for {call.name!r} were not valid JSON. Call it again."}, True, [], [], None
     return await _execute_tool(call.name, call.arguments, context)
+
+
+REPLY_LANGUAGE = {
+    "vi": "The shopper's latest message is in Vietnamese. Reply entirely in Vietnamese.",
+    "en": "The shopper's latest message is in English. Reply entirely in English.",
+}
+
+
+def system_prompt_for(lang: str) -> str:
+    """The system prompt with this turn's reply language stated outright.
+
+    The prompt's own examples are Vietnamese, and the first eval run caught the
+    model answering an English complaint in Vietnamese despite the "mirror the
+    shopper" rule. The classifier had labelled the language correctly, so it is
+    passed on. It goes last, so the long shared prefix stays cacheable.
+    """
+    return f"{SYSTEM_PROMPT}\n\n# This turn\n\n{REPLY_LANGUAGE['vi' if lang == 'vi' else 'en']}"
 
 
 async def run_turn(
@@ -193,7 +215,7 @@ async def run_turn(
     # --- Model and tool loop ------------------------------------------------
     context = ToolContext(session_id=session_id, lang=state.lang)  # type: ignore[arg-type]
     conversation = get_backend().conversation(
-        system=SYSTEM_PROMPT,
+        system=system_prompt_for(state.lang),
         messages=build_messages(history, user_message),
         tools=registry.definitions(strict=settings.llm_strict_tools),
         effort=settings.agent_effort,  # type: ignore[arg-type]
@@ -246,7 +268,7 @@ async def run_turn(
             )
 
             outcomes: list[ToolOutcome] = []
-            for call, (payload, is_error, sources, products) in zip(result.tool_calls, results):
+            for call, (payload, is_error, sources, products, tracking) in zip(result.tool_calls, results):
                 state.tools_used.append(call.name)
                 state.sources.update(sources)
                 for source in sources:
@@ -254,6 +276,8 @@ async def run_turn(
                         state.retrieved.append(source)
                 state.tool_payloads.append(payload)
                 state.products.extend(products)
+                if tracking is not None:
+                    state.tracking.append(tracking)
                 if call.name == "create_handoff" and not is_error:
                     state.escalated = True
 
@@ -291,6 +315,8 @@ async def run_turn(
             citation_check.invalid,
         )
 
+    if state.tracking:
+        yield {"type": "tracking", "items": state.tracking}
     if state.products:
         yield {"type": "products", "items": _dedupe_products(state.products)}
     if citation_check.citations:
@@ -339,6 +365,7 @@ def _done_event(
         "text": text,
         "citations": citations,
         "products": _dedupe_products(state.products),
+        "tracking": state.tracking,
         "outcome": {
             "lang": state.lang,
             "intent": state.intent,

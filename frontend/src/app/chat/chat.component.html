@@ -44,6 +44,10 @@
             <p class="body"><span class="caret on"></span></p>
           }
 
+          @for (order of message.tracking ?? []; track order.order_code) {
+            <app-order-map [tracking]="order" [lang]="lang()" />
+          }
+
           @if (message.products?.length) {
             <div class="cards">
               @for (product of message.products; track product.sku) {
