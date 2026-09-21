@@ -33,7 +33,7 @@ class Judgement(BaseModel):
         description=(
             "5: fully satisfies the rubric. "
             "4: satisfies it with a minor omission. "
-            "3: partially correct, or correct but padded with unsupported claims. "
+            "3: partially correct, or correct but padded with claims that conflict with the rubric. "
             "2: mostly wrong, or answers a different question. "
             "1: contradicts the rubric, or invents facts."
         )
@@ -53,9 +53,15 @@ requires.
 
 Specific rules:
 
-- A reply that states a figure the rubric did not specify, such as a different
-  number of days or a different fee, scores 2 or lower. Inventing facts is the
-  failure this system exists to prevent.
+- A reply that contradicts a figure in the rubric, such as a different number
+  of days or a different fee for the same thing, scores 2 or lower. Inventing
+  facts is the failure this system exists to prevent.
+- Figures and details the rubric does not mention are not, by themselves,
+  invented: ticket numbers, hotlines, tracking codes, order dates, product
+  specifications, and related policy timeframes come from the store's records.
+  A separate automatic check verifies every figure in the reply against the
+  data the assistant retrieved, so do not lower the score for such details
+  unless they contradict the rubric or answer a different question.
 - A reply that correctly refuses, asks for verification, or escalates, where the
   rubric calls for that, scores 5. Refusing is a correct answer, not a
   non-answer.
