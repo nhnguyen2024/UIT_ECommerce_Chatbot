@@ -62,16 +62,23 @@ CREDENTIAL_WARNING = {
     ),
 }
 
+# Names the categories, because the commonest out-of-scope question is for a
+# product the store does not carry ("do you sell running shoes?"), and a reply
+# that never says what the store does sell leaves the shopper guessing.
 OUT_OF_SCOPE_REPLY = {
     "vi": (
-        "Xin lỗi bạn, mình chỉ hỗ trợ về sản phẩm của cửa hàng, chính sách đổi "
-        "trả, bảo hành, vận chuyển, thanh toán và tra cứu đơn hàng. Bạn cần mình "
-        "giúp gì trong những phần này không?"
+        "Xin lỗi bạn, yêu cầu này nằm ngoài phạm vi mình hỗ trợ. Northlight chỉ "
+        "bán đồ điện tử: điện thoại, máy tính bảng, laptop, tai nghe và loa, đồng "
+        "hồ thông minh, tivi, đồ gia dụng và phụ kiện sạc. Mình có thể tư vấn sản "
+        "phẩm trong các nhóm trên, giải đáp chính sách đổi trả, bảo hành, vận "
+        "chuyển, thanh toán hoặc tra cứu đơn hàng cho bạn."
     ),
     "en": (
-        "Sorry, I can only help with this store's products, our return, warranty, "
-        "shipping and payment policies, and order tracking. Is there something in "
-        "those areas I can help with?"
+        "Sorry, that is outside what I can help with. Northlight only sells "
+        "electronics: phones, tablets, laptops, headphones and speakers, "
+        "smartwatches, TVs, home appliances, and charging accessories. I can help "
+        "with products in those categories, our return, warranty, shipping and "
+        "payment policies, or tracking an order."
     ),
 }
 

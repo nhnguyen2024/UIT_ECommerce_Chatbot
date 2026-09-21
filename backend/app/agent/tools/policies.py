@@ -58,7 +58,10 @@ _CHUNK_FIELDS = {
                 "description": (
                     "Restrict to one policy area when the question is clearly "
                     "about it. Null searches all policies, which is safer when "
-                    "the question spans areas."
+                    "the question spans areas. Refunds, including how long a "
+                    "refund takes for each payment method, are under 'return', "
+                    "not 'payment'; 'payment' covers how to pay, instalments, "
+                    "and invoices. When unsure, use null."
                 ),
             },
             "limit": {
