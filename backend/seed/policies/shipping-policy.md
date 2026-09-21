@@ -67,6 +67,22 @@ The carrier is assigned automatically based on the delivery region and order wei
 
 The tracking code is sent by SMS and email as soon as the order is handed to the carrier.
 
+## [marketplace-shipping] Giao hàng cho đơn mua trên sàn | Delivery for marketplace orders
+
+@vi
+Đơn đặt trên Shopee, Lazada và TikTok Shop được đóng gói tại cùng kho và giao bởi cùng các đơn vị vận chuyển nêu tại mục Đơn vị vận chuyển. Thời gian giao hàng dự kiến không khác so với đơn đặt trên website.
+
+Tuy nhiên, đơn vị vận chuyển của đơn mua trên sàn do sàn chỉ định, nên có thể không nằm trong danh sách đối tác thường dùng của cửa hàng. Mã vận đơn hiển thị trên ứng dụng của sàn là mã chính thức để tra cứu.
+
+Phí vận chuyển và các chương trình miễn phí vận chuyển của đơn mua trên sàn do sàn quy định, không áp dụng mức phí tại mục Phí vận chuyển.
+
+@en
+Orders placed on Shopee, Lazada, and TikTok Shop are packed in the same warehouse and delivered by the same carriers listed in the Carriers section. Estimated delivery times are no different from website orders.
+
+The carrier for a marketplace order is however assigned by the marketplace, so it may fall outside the store's usual partner list. The tracking code shown in that platform's app is the authoritative one to track with.
+
+Shipping fees and free-shipping promotions on marketplace orders are set by the marketplace; the rates in the Shipping fees section do not apply to them.
+
 ## [inspection-on-delivery] Chính sách đồng kiểm | Inspection on delivery
 
 @vi

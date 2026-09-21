@@ -194,6 +194,50 @@ async def check_orders(context: ToolContext) -> bool:
         "+84 901 234 567 and 0901234567 are the same number.",
     )
 
+    # Multi-channel lookups. A shopper who bought on a marketplace only ever saw
+    # that marketplace's code, so it has to resolve to the same order.
+    by_shopee_code = await get_order_status(
+        context=context, order_code="250905K7MQ2XPL", contact="0901234567"
+    )
+    ok &= report(
+        "get_order_status: a Shopee order code resolves",
+        by_shopee_code.data.get("order_code") == "DH2026090001",
+        f"channel: {by_shopee_code.data.get('channel')}",
+    )
+
+    ok &= report(
+        "get_order_status: both codes return the same order",
+        by_shopee_code.data == good.data,
+        "The internal code and the marketplace code are two keys to one record.",
+    )
+
+    by_tiktok_code = await get_order_status(
+        context=context, order_code="577483920164523", contact="0938111222"
+    )
+    ok &= report(
+        "get_order_status: a TikTok Shop order code resolves",
+        by_tiktok_code.data.get("channel") == "tiktok_shop",
+    )
+
+    # Verification is not weakened by the second lookup key.
+    marketplace_wrong = await get_order_status(
+        context=context, order_code="250905K7MQ2XPL", contact="0900000000"
+    )
+    ok &= report(
+        "get_order_status: a marketplace code still needs a matching contact",
+        marketplace_wrong.data == wrong.data,
+        "Otherwise the new key would be a way around verification.",
+    )
+
+    website_order = await get_order_status(
+        context=context, order_code="DH2026090003", contact="0987654321"
+    )
+    ok &= report(
+        "get_order_status: website orders report no marketplace code",
+        website_order.data.get("channel") == "website"
+        and website_order.data.get("channel_order_code") is None,
+    )
+
     return ok
 
 

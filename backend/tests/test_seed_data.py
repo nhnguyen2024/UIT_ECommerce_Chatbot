@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.db.schema import OrderStatus
+from app.db.schema import Channel, OrderStatus
 from seed.catalog import TEMPLATES, generate_products
 from seed.orders import SHOWCASE, STATUS_FLOW, generate_orders
 from seed.parse_policies import parse_all
@@ -162,9 +162,11 @@ class TestOrders:
             assert len(order.email_hash) == 64
             assert len(order.phone_last4) == 4
 
-    @pytest.mark.parametrize("code,_phone,_email,status,_skus,_days", SHOWCASE)
+    @pytest.mark.parametrize(
+        "code,_channel,_channel_code,_phone,_email,status,_skus,_days", SHOWCASE
+    )
     def test_showcase_orders_are_present_with_the_expected_status(
-        self, code, _phone, _email, status, _skus, _days
+        self, code, _channel, _channel_code, _phone, _email, status, _skus, _days
     ):
         """The demo and the eval dataset reference these by code."""
         assert self.by_code[code].status == status
@@ -172,7 +174,7 @@ class TestOrders:
     def test_showcase_contacts_verify(self):
         from app.security import contact_matches
 
-        for code, phone, email, *_ in SHOWCASE:
+        for code, _channel, _channel_code, phone, email, *_ in SHOWCASE:
             order = self.by_code[code]
             assert contact_matches(
                 supplied=phone, phone_hash=order.phone_hash, email_hash=order.email_hash
@@ -196,6 +198,52 @@ class TestOrders:
     def test_every_status_in_the_enum_is_exercised(self):
         produced = {order.status for order in self.orders}
         assert produced == set(OrderStatus.__args__)
+
+    # --- Sales channels ----------------------------------------------------
+
+    def test_every_channel_in_the_enum_is_exercised(self):
+        """The dashboard's channel breakdown needs all four to appear."""
+        produced = {order.channel for order in self.orders}
+        assert produced == set(Channel.__args__)
+
+    def test_marketplace_orders_carry_the_platform_code(self):
+        for order in self.orders:
+            if order.channel != "website":
+                assert order.channel_order_code, order.order_code
+
+    def test_website_orders_have_no_marketplace_code(self):
+        for order in self.orders:
+            if order.channel == "website":
+                assert order.channel_order_code is None
+
+    def test_marketplace_codes_are_unique(self):
+        """They are a lookup key, so a collision would return the wrong order."""
+        codes = [o.channel_order_code for o in self.orders if o.channel_order_code]
+        assert len(set(codes)) == len(codes)
+
+    def test_marketplace_codes_never_collide_with_internal_codes(self):
+        """`get_order_status` matches on either, so the two spaces must be disjoint."""
+        internal = {o.order_code for o in self.orders}
+        external = {o.channel_order_code for o in self.orders if o.channel_order_code}
+        assert not (internal & external)
+
+    def test_marketplace_codes_are_ascii_and_uppercase(self):
+        """Lookup upper-cases what the shopper types before matching."""
+        for order in self.orders:
+            code = order.channel_order_code
+            if code:
+                assert code.isascii() and code == code.upper(), code
+
+    @pytest.mark.parametrize(
+        "code,channel,channel_code,_phone,_email,_status,_skus,_days", SHOWCASE
+    )
+    def test_showcase_channels_are_fixed(
+        self, code, channel, channel_code, _phone, _email, _status, _skus, _days
+    ):
+        """The demo pastes these marketplace codes, so they must not drift."""
+        order = self.by_code[code]
+        assert order.channel == channel
+        assert order.channel_order_code == channel_code
 
 
 class TestCategoryConsistency:

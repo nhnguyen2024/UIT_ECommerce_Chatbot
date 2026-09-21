@@ -20,7 +20,7 @@ from __future__ import annotations
 import random
 from datetime import datetime, timedelta, timezone
 
-from app.db.schema import Order, OrderItem, OrderTimelineEntry
+from app.db.schema import Channel, Order, OrderItem, OrderTimelineEntry
 from app.security import hash_email, hash_phone, normalize_phone
 from seed.catalog import generate_products
 
@@ -31,6 +31,37 @@ BULK_COUNT = 320
 NOW = datetime(2026, 9, 9, 10, 0, tzinfo=timezone.utc)
 
 CARRIERS = ["Giao Hàng Nhanh", "Giao Hàng Tiết Kiệm", "Viettel Post", "J&T Express"]
+
+# How the bulk orders are split across sales channels.
+#
+# Marketplaces outweigh the company's own website, which is the usual shape for
+# a Vietnamese seller and the reason this chatbot exists: most shoppers asking
+# about an order did not buy on the site they are asking on.
+CHANNEL_MIX = (
+    ["shopee"] * 38
+    + ["lazada"] * 22
+    + ["tiktok_shop"] * 18
+    + ["website"] * 22
+)
+
+# Marketplace code shapes, close enough to the real ones that a shopper pasting
+# a code recognises it. Each platform issues its own format, and none of them
+# resemble the internal DH code, so the two code spaces stay disjoint.
+CHANNEL_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789"
+
+
+def _channel_order_code(channel: str, created_at: datetime, rng: random.Random) -> str | None:
+    """Mint the code the marketplace itself would have shown the shopper."""
+    if channel == "shopee":
+        # Shopee prefixes with the order date, then eight uppercase characters.
+        stamp = created_at.strftime("%y%m%d")
+        tail = "".join(rng.choice(CHANNEL_CODE_ALPHABET) for _ in range(8))
+        return f"{stamp}{tail}"
+    if channel == "lazada":
+        return str(rng.randint(10**12, 10**13 - 1))
+    if channel == "tiktok_shop":
+        return f"577{rng.randint(10**14, 10**15 - 1)}"
+    return None
 
 FAMILY_NAMES = ["Nguyễn", "Trần", "Lê", "Phạm", "Hoàng", "Huỳnh", "Phan", "Vũ", "Đặng", "Bùi"]
 MIDDLE_NAMES = ["Văn", "Thị", "Hữu", "Minh", "Thanh", "Ngọc", "Quang", "Gia", "Khánh"]
@@ -98,6 +129,8 @@ def _shipping_fee(subtotal: int, rng: random.Random) -> int:
 def _build_order(
     *,
     order_code: str,
+    channel: Channel,
+    channel_order_code: str | None,
     name: str,
     phone: str,
     email: str,
@@ -124,6 +157,8 @@ def _build_order(
 
     return Order(
         order_code=order_code,
+        channel=channel,
+        channel_order_code=channel_order_code or _channel_order_code(channel, created_at, rng),
         customer_name=name,
         phone_hash=hash_phone(phone),
         phone_last4=normalized_phone[-4:],
@@ -152,17 +187,27 @@ def _item_from_product(product, quantity: int) -> OrderItem:
 
 
 # Fixed cases the demo and the eval dataset reference by code.
-# (order_code, phone, email, status, product SKUs, days ago)
+#
+# Their marketplace codes are fixed too, not generated, because the demo shows a
+# shopper pasting the code their platform gave them. Between them the five cover
+# all four channels.
+#
+# (order_code, channel, channel_order_code, phone, email, status, SKUs, days ago)
 SHOWCASE = [
-    ("DH2026090001", "0901234567", "an.nguyen@example.com", "out_for_delivery",
+    ("DH2026090001", "shopee", "250905K7MQ2XPL",
+     "0901234567", "an.nguyen@example.com", "out_for_delivery",
      ["PHN-001", "AUD-002"], 4),
-    ("DH2026090002", "0912345678", "binh.tran@example.com", "delivered",
+    ("DH2026090002", "lazada", "7012845390127",
+     "0912345678", "binh.tran@example.com", "delivered",
      ["LAP-002"], 12),
-    ("DH2026090003", "0987654321", "chi.le@example.com", "cancelled",
+    ("DH2026090003", "website", None,
+     "0987654321", "chi.le@example.com", "cancelled",
      ["TAB-001", "ACC-001"], 8),
-    ("DH2026090004", "0938111222", "dung.pham@example.com", "returned",
+    ("DH2026090004", "tiktok_shop", "577483920164523",
+     "0938111222", "dung.pham@example.com", "returned",
      ["KIT-002"], 25),
-    ("DH2026090005", "0977333444", "ha.hoang@example.com", "packing",
+    ("DH2026090005", "shopee", "250908R4NHB9TW",
+     "0977333444", "ha.hoang@example.com", "packing",
      ["TVS-000", "ACC-002", "WAT-000"], 1),
 ]
 
@@ -181,11 +226,13 @@ def generate_orders(bulk_count: int = BULK_COUNT) -> list[Order]:
     by_sku = {product.sku: product for product in products}
     orders: list[Order] = []
 
-    for order_code, phone, email, status, skus, days_ago in SHOWCASE:
+    for order_code, channel, channel_code, phone, email, status, skus, days_ago in SHOWCASE:
         items = [_item_from_product(by_sku[sku], 1) for sku in skus]
         orders.append(
             _build_order(
                 order_code=order_code,
+                channel=channel,  # type: ignore[arg-type]
+                channel_order_code=channel_code,
                 name=SHOWCASE_NAMES[order_code],
                 phone=phone,
                 email=email,
@@ -211,6 +258,7 @@ def generate_orders(bulk_count: int = BULK_COUNT) -> list[Order]:
 
     for index in range(bulk_count):
         status = rng.choice(statuses)
+        channel = rng.choice(CHANNEL_MIX)
         item_count = rng.choices([1, 2, 3], weights=[62, 28, 10])[0]
         chosen = rng.sample(products, item_count)
         items = [_item_from_product(p, rng.choices([1, 2], weights=[85, 15])[0]) for p in chosen]
@@ -222,6 +270,8 @@ def generate_orders(bulk_count: int = BULK_COUNT) -> list[Order]:
         orders.append(
             _build_order(
                 order_code=f"DH2026{rng.randint(1, 9):02d}{index + 100:05d}",
+                channel=channel,  # type: ignore[arg-type]
+                channel_order_code=None,
                 name=name,
                 phone=digits,
                 email=f"{slug}@example.com",
@@ -245,11 +295,24 @@ if __name__ == "__main__":
     for status, total in sorted(counts.items(), key=lambda kv: -kv[1]):
         print(f"  {status:<18} {total:>4}")
 
+    print("\nBy channel:")
+    channels: dict[str, int] = {}
+    for order in generated:
+        channels[order.channel] = channels.get(order.channel, 0) + 1
+    for channel, total in sorted(channels.items(), key=lambda kv: -kv[1]):
+        print(f"  {channel:<18} {total:>4}")
+
     print("\nShowcase orders:")
     for order in generated[: len(SHOWCASE)]:
         total = f"{order.total:,}".replace(",", ".")
-        print(f"  {order.order_code}  {order.customer_name:<18} {order.status:<17} "
+        print(f"  {order.order_code}  {order.channel:<12} {order.channel_order_code or '-':<16} "
+              f"{order.customer_name:<18} {order.status:<17} "
               f"{total:>11} d  {len(order.timeline)} steps  ****{order.phone_last4}")
 
     codes = [o.order_code for o in generated]
     print("\nOrder codes unique:", len(set(codes)) == len(codes))
+
+    channel_codes = [o.channel_order_code for o in generated if o.channel_order_code]
+    print("Marketplace codes unique:", len(set(channel_codes)) == len(channel_codes))
+    print("Marketplace codes distinct from internal codes:",
+          not (set(channel_codes) & set(codes)))

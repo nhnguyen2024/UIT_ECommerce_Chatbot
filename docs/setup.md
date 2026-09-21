@@ -50,7 +50,7 @@ python3 -m venv .venv
 ```
 
 This creates the collections and indexes, generates 480 products and 325 orders,
-parses the five policy documents into 23 citable chunks, and waits for the Atlas
+parses the five policy documents into 26 citable chunks, and waits for the Atlas
 search indexes to become queryable. The wait is normal and takes a few minutes on
 the free tier: Atlas is embedding every product and policy chunk with Voyage AI.
 
@@ -83,20 +83,27 @@ Try one of each kind of request:
 | Ask | What should happen |
 |---|---|
 | `Chính sách đổi trả trong bao lâu?` | Answers 7 days, with a citation chip |
-| `Tìm áo khoác nam dưới 500k` | Product cards, all at or below 500,000đ |
+| `Tìm tai nghe dưới 500k` | Product cards, all at or below 500,000đ |
 | `Đơn DH2026090001, sđt 0901234567` | Reports the order is out for delivery |
+| `Đơn Shopee 250905K7MQ2XPL, sđt 0901234567` | The same order, found by its Shopee code |
+| `Mua trên Shopee muốn trả hàng thì làm sao?` | Cites the Shopee process, 15 days, in the Shopee app |
 | `Đơn DH2026090001, sđt 0900000000` | Refuses: the contact does not match |
+| `Đơn Shopee 250905K7MQ2XPL, sđt 0900000000` | Refuses identically: the second code is not a way in |
 | `Thủ đô nước Pháp là gì?` | Declines as out of scope |
 
-The fourth one is the important one. If it reveals the order status, identity
-verification is broken.
+The last two refusals are the important ones. If either reveals the order status,
+identity verification is broken.
+
+The two Shopee rows are what demonstrate the consolidated-order design: the same
+order is reachable by the code the shopper actually has, and widening the lookup
+key did not widen what can be read.
 
 ## 7. Measure it
 
 ```bash
 cd backend
 .venv/bin/python -m evals.run_eval --limit 5      # smoke test, a few cents
-.venv/bin/python -m evals.run_eval                # full 47-case run
+.venv/bin/python -m evals.run_eval                # full 56-case run
 ```
 
 The runner prints a cost estimate and waits for confirmation before spending.

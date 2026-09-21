@@ -26,6 +26,48 @@ underneath. The first is a ranking problem. The second is a retrieval problem
 where being wrong is worse than being unhelpful. The third is an authorisation
 problem wearing a conversational disguise.
 
+### The multi-channel setting
+
+Northlight sells through four channels: its own website, and the Shopee, Lazada,
+and TikTok Shop marketplaces. This is the ordinary shape of a Vietnamese retailer
+of this size, and it is the reason the support problem is worth automating.
+
+Each marketplace provides its own seller chat. None of them can see the other
+three. A seller working this way answers the same return-policy question in four
+separate inboxes, and a shopper's answer depends on which app they happened to
+open. Order data is fragmented the same way: each platform issues its own order
+code in its own format, and the seller's internal code is never shown to the
+shopper at all.
+
+This system is the company's own consolidated support site. It is not a bot
+deployed into a marketplace's chat window. One assistant, one policy corpus, and
+one order store cover every channel. The shopper reaches it from the company's website or from a link
+in a post-purchase message, and it answers about an order no matter where that
+order was placed.
+
+Two consequences run through the rest of this document:
+
+- **An order has two identities.** Its internal `order_code`, and the
+  `channel_order_code` the marketplace issued. Lookup accepts either, because the
+  shopper only ever saw the second one. See §7.
+- **Policy answers are channel-dependent.** Return windows, refund destinations,
+  and shipping fees genuinely differ per marketplace, so the corpus carries
+  per-channel sections and the assistant must follow the order's channel rather
+  than quoting the website's terms. See §5.
+
+### Why no marketplace API integration
+
+Integrating Shopee's or Lazada's Open Platform API would require an approved
+partner account and per-shop OAuth, neither of which is available for a student
+project, and neither of which this design needs.
+
+It is also not how the problem is solved in practice. A seller at this scale
+already runs an order management system (Sapo, KiotViet, Haravan, or a
+spreadsheet) into which marketplace orders are exported and normalised. The
+order store in this system stands in for exactly that: records the seller already
+possesses, carrying the channel they came from. Adding a live API would change
+where the rows come from, not how the assistant reasons about them.
+
 The assistant serves **Vietnamese and English**. All source code, identifiers,
 and documentation are English; the two languages appear only as content.
 
@@ -36,6 +78,12 @@ and documentation are English; the two languages appear only as content.
   misinformation rather than money.
 - No general conversation. Anything outside the three jobs is declined.
 - No claims about products the store does not stock.
+- **No live marketplace integration.** No Shopee, Lazada, or TikTok Shop API is
+  called, and the assistant is not deployed into those platforms' chat windows.
+  It answers about marketplace orders from the seller's own consolidated records.
+- **No claims about a marketplace's own business.** Its prices, its promotions,
+  its other sellers, or the state of a shopper's account there. An evaluation
+  case asserts this refusal.
 
 ---
 
@@ -193,11 +241,20 @@ nested language map, because Atlas Search filters and sorts read them directly.
 | Collection | Contents | Notes |
 |---|---|---|
 | `products` | 480 items across 8 categories | `embedding_source` combines both languages |
-| `policies` | 23 chunks from 5 documents | `chunk_id` is the citation anchor |
-| `orders` | 325 orders | Contacts stored only as salted hashes |
+| `policies` | 26 chunks from 5 documents | `chunk_id` is the citation anchor |
+| `orders` | 325 orders across 4 sales channels | Contacts stored only as salted hashes; two lookup codes |
 | `conversations` | One document per session | Messages appended, not rewritten |
 | `events` | One row per user turn | Feeds the dashboard |
 | `handoffs` | Human agent queue | |
+
+### Channel on the order
+
+`channel` is one of `website`, `shopee`, `lazada`, `tiktok_shop`. It decides
+which policy passage answers a return or refund question, and it is the field the
+dashboard would break operating figures down by. Marketplace
+orders additionally carry `channel_order_code`, indexed unique and **sparse**.
+Website orders have none, and a plain unique index would treat all their missing
+values as one colliding null.
 
 ### One embedded field per document
 
@@ -264,7 +321,20 @@ stability is what makes citations meaningful over time, and hand-authored
 sections also align chunk boundaries with topic boundaries, which a fixed window
 does not.
 
-23 chunks from 5 documents, each 300 to 600 characters per language.
+26 chunks from 5 documents, each 300 to 900 characters per language.
+
+This stability paid off when the per-channel sections were added. Three new
+sections (`return-policy#marketplace-returns`,
+`return-policy#marketplace-refunds`, and `shipping-policy#marketplace-shipping`)
+appended three new anchors without renumbering or invalidating a single existing
+citation. A token-count chunker would have rotted the whole evaluation set.
+
+**Per-channel policy is split by question rather than bundled per channel.**
+Returns and refunds for marketplace orders occupy two sections, because a shopper
+asks about them separately. The first draft bundled them into a single
+1,242-character chunk, roughly two and a half times the corpus average. A chunk
+that long dilutes its own embedding and retrieves worse for both questions than
+either half does alone.
 
 ### Embedding is pluggable
 
@@ -339,11 +409,36 @@ The system prompt reinforces this: never confirm or deny that an order code
 exists, and never echo a full phone number. The tool returns a masked form
 (`******4567`) for the shopper to recognise.
 
+### Two codes, one credential
+
+A marketplace order carries two identifiers: the seller's internal `order_code`
+and the `channel_order_code` the platform issued. The shopper has only ever seen
+the second one. Requiring the first would make order tracking unusable for the
+majority of orders, so lookup matches on either:
+
+```python
+{"$or": [{"order_code": supplied}, {"channel_order_code": supplied}]}
+```
+
+Adding a second lookup key to an authorisation path deserves justification.
+Neither code is a credential; both are identifiers. The contact detail is the
+credential, and it is checked identically no matter which key found the row. The
+wider key space therefore changes which orders can be addressed, without changing
+which orders can be read.
+
+The two spaces are also kept disjoint, so that a marketplace code can never
+collide with an internal code and a single supplied string resolves to at most
+one order. Tests assert the disjointness and the uniqueness of each space,
+`seed.smoke` asserts that a marketplace code with a wrong contact returns the
+same refusal as an internal code with a wrong contact, and evaluation case
+`ord-sec-12` asserts the same property end to end through the model.
+
 ### Evaluation coverage
 
-Four dataset cases probe this directly: a wrong phone number, a four-digit
-fragment, an asserted claim of ownership, and prompt injection asking the
-assistant to bypass verification. Each asserts that no order status appears in
+Five dataset cases probe this directly: a wrong phone number, a four-digit
+fragment, an asserted claim of ownership, prompt injection asking the assistant
+to bypass verification, and a marketplace order code supplied with a contact that
+does not match it. Each asserts that no order status appears in
 the reply, with matching that folds Vietnamese diacritics so `"dang giao"` is
 caught as well as `"đang giao"`.
 
@@ -408,14 +503,21 @@ model can call a tool again if it needs current data.
 
 ## 10. Evaluation methodology
 
-49 labelled bilingual cases across four suites.
+56 labelled bilingual cases across four suites.
 
 | Suite | Cases | Measures |
 |---|---|---|
-| Policy | 16 | Retrieval and factual accuracy |
+| Policy | 20 | Retrieval and factual accuracy, including 4 per-channel cases |
 | Product | 10 | Filter honouring and recommendation quality |
-| Order | 9 | Verification behaviour, including 4 security cases |
+| Order | 12 | Verification behaviour, including 5 security cases and 2 marketplace-code lookups |
 | Guardrail | 14 | Refusals, injection resistance, escalation |
+
+Seven cases cover the multi-channel behaviour specifically: resolving a Shopee
+and a TikTok Shop order code, refusing a marketplace code paired with a
+mismatched contact, and four policy questions whose correct answer depends on
+the channel the order came from. Three of those four are written so that quoting
+the website's terms scores as wrong rather than merely incomplete, because that is
+the failure mode this design is exposed to.
 
 ### Metrics
 
@@ -491,7 +593,17 @@ Stated plainly, because a defence goes better when the author raises these first
 quotes shopper messages. It needs a gate before any public exposure.
 
 **All data is synthetic.** The catalogue, orders, and policy documents were
-generated or written for this project. No real platform integration exists.
+generated or written for this project.
+
+**No live marketplace integration.** Marketplace orders are seeded records
+carrying a channel and a platform-shaped order code, standing in for what a
+seller would export from Shopee, Lazada, or TikTok Shop into their order system.
+This is a deliberate scope decision, argued in §1, not an unfinished feature: the
+partner API access it would require is not available to this project, and it
+would change where the order rows come from rather than how the assistant
+reasons about them. The ingestion path is what remains untested as a result:
+reconciling exports, handling a platform's status vocabulary, and dealing with
+codes that change after a split shipment.
 
 **Automated Embedding is a public preview feature.** The `explicit` fallback
 exists for this reason but has not been exercised end to end.

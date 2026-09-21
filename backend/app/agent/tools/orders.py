@@ -36,6 +36,9 @@ HANDOFF_REASONS = [
     name="get_order_status",
     description=(
         "Look up one order's current status, item list, and delivery timeline. "
+        "Works for orders placed on the website and on Shopee, Lazada, or "
+        "TikTok Shop: accepts either the store's own order code or the code the "
+        "marketplace issued, whichever the shopper quotes. "
         "Requires BOTH the order code AND a contact detail that matches the "
         "order: the full phone number used to place it, or its email address. "
         "Ask the shopper for the contact detail if they have not given one; never "
@@ -48,7 +51,12 @@ HANDOFF_REASONS = [
         "properties": {
             "order_code": {
                 "type": "string",
-                "description": "The order code, for example 'DH2026090001'.",
+                "description": (
+                    "The order code exactly as the shopper wrote it. Either the "
+                    "store's own code, for example 'DH2026090001', or the "
+                    "marketplace's code, for example Shopee '250905K7MQ2XPL'. "
+                    "Do not try to convert between the two."
+                ),
             },
             "contact": {
                 "type": "string",
@@ -66,8 +74,13 @@ HANDOFF_REASONS = [
 async def get_order_status(
     *, context: ToolContext, order_code: str, contact: str
 ) -> ToolResult:
+    # Either code identifies the order. A shopper who bought on a marketplace
+    # was never shown the internal code, so requiring it would make this tool
+    # useless for the majority of orders.
+    supplied_code = order_code.strip().upper()
     document = await get_db()[schema.ORDERS].find_one(
-        {"order_code": order_code.strip().upper()}, {"_id": 0}
+        {"$or": [{"order_code": supplied_code}, {"channel_order_code": supplied_code}]},
+        {"_id": 0},
     )
 
     # One response for "no such order" and "wrong contact" alike. Distinguishing
@@ -120,6 +133,14 @@ async def get_order_status(
         data={
             "verified": True,
             "order_code": document["order_code"],
+            # The shopper thinks of the order by its marketplace code and by the
+            # platform they bought on. Both are returned so the answer can name
+            # them, and so return and refund questions can be routed correctly.
+            "channel": document.get("channel", "website"),
+            "channel_label": schema.CHANNEL_LABELS.get(
+                document.get("channel", "website"), "Northlight.vn"
+            ),
+            "channel_order_code": document.get("channel_order_code"),
             "customer_name": document["customer_name"],
             # Masked, never the real number: enough for the shopper to recognise
             # their own order, useless to anyone who guessed the code.

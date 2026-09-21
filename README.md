@@ -5,6 +5,19 @@ electronics retailer. The catalogue covers phones, tablets, laptops, audio,
 wearables, televisions, home appliances, and charging accessories, in the mould
 of Thế Giới Di Động or FPT Shop.
 
+Northlight sells through four channels: its own website, and the Shopee, Lazada,
+and TikTok Shop marketplaces. Support is not handled on those marketplaces. Each
+one has its own seller chat, its own inbox, and no view of the other three, so a
+shopper asking "where is my order?" gets a different answer depending on where
+they happen to ask, and the seller answers the same questions four times over.
+
+This chatbot is the company's own consolidated support site, answering for orders
+from every channel in one place. That is the case for building it: most shoppers
+asking about an order did not buy on the site they are asking on. No marketplace
+API is integrated, and none is required. The seller already holds its own order
+records, which is the position a real seller is in after exporting from Shopee,
+Lazada and TikTok Shop into a single order system.
+
 Electronics rather than general merchandise on purpose: warranty terms, return
 windows, and spec comparison all carry real weight on expensive goods, so all
 three jobs below have something substantial to work with.
@@ -12,8 +25,8 @@ three jobs below have something substantial to work with.
 It covers three jobs:
 
 1. **Product consultation** — semantic and keyword search over a product catalogue, with filters on category, price, and rating.
-2. **Policy questions** — retrieval-augmented answers over store policy documents, where every claim cites the passage it came from.
-3. **Order tracking** — status and delivery timeline lookups, gated behind identity verification.
+2. **Policy questions** — retrieval-augmented answers over store policy documents, where every claim cites the passage it came from. Return windows, refund destinations, and shipping fees differ per channel, and the answer has to follow the channel the order came from.
+3. **Order tracking** — status and delivery timeline lookups across all four channels, accepting either the store's own order code or the marketplace's, gated behind identity verification.
 
 The chatbot answers in **Vietnamese and English**. All source code, comments, and documentation are in English; both languages appear only as content.
 
@@ -37,6 +50,8 @@ MongoDB Atlas M0  (Automated Embedding, Voyage AI)
 ## Design decisions worth knowing
 
 **The agent loop is hand-written, not delegated to the SDK tool runner.** The runner keeps its own message history and does not expose it, so an app that persists conversations has to mirror history anyway. A manual loop also lets the backend emit progress events mid-turn and run a guardrail check between rounds.
+
+**An order is reachable by either of its two codes.** A marketplace issues its own order code and never shows the shopper the seller's internal one, so requiring the internal code would make order tracking useless for most orders. Each order therefore stores `channel` and `channel_order_code` alongside `order_code`, and lookup matches on either, as real multi-channel order systems do. The second key is a lookup convenience and does not weaken verification, which the smoke checks and a dedicated evaluation case both assert.
 
 **Order codes alone never unlock an order.** Codes are short and get shared in screenshots. `get_order_status` requires a matching phone number or email, compares salted hashes, and returns an identical response whether the code is wrong or the contact is wrong, so it cannot be used to test which codes exist. The database stores no readable contact details.
 
@@ -158,8 +173,8 @@ four-digit fragment, and an unknown order code identically.
 
 ## Evaluation
 
-A 47-case bilingual dataset covering policy questions, product consultation,
-order tracking, and adversarial input.
+A 56-case bilingual dataset covering policy questions, product consultation,
+order tracking, multi-channel lookups, and adversarial input.
 
 ```bash
 cd backend
@@ -185,8 +200,9 @@ Measured:
 | Cost and latency | Recorded per turn from the API usage figures |
 
 The security cases are the ones worth watching. They cover a wrong phone number,
-a four-digit fragment, an asserted claim of ownership, and prompt injection that
-asks the assistant to bypass verification.
+a four-digit fragment, an asserted claim of ownership, prompt injection that asks
+the assistant to bypass verification, and a marketplace order code paired with a
+contact that does not match it.
 
 ## Operations dashboard
 
@@ -225,9 +241,10 @@ See [docs/setup.md](docs/setup.md) for the full walkthrough and troubleshooting.
 
 | Document | Contents |
 |---|---|
+| [PROJECT.md](PROJECT.md) | Project state: the scenario, what is done, what is left, and the conventions |
 | [docs/setup.md](docs/setup.md) | From an empty machine to a working chatbot, with troubleshooting |
 | [docs/architecture.md](docs/architecture.md) | Design record: the life of a turn, retrieval design, the order-lookup threat model, evaluation methodology, and known limitations |
 
 ## Data
 
-All data is **synthetic**. Product names, customers, and orders are generated; the policy documents are written for this project and describe a fictional store. Nothing here comes from a real e-commerce platform.
+All data is **synthetic**. Product names, customers, and orders are generated; the policy documents are written for this project and describe a fictional store. Nothing here comes from a real e-commerce platform, and no marketplace API is called. The Shopee, Lazada, and TikTok Shop order codes are generated in the shape those platforms use, so that the consolidated-order model is exercised realistically; they correspond to no real order.

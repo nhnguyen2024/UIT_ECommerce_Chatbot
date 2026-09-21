@@ -53,6 +53,23 @@ PRODUCT_CATEGORIES = [
 
 PolicyType = Literal["return", "warranty", "shipping", "payment", "privacy"]
 
+# Where the order was placed.
+#
+# The company sells on its own website and on several marketplaces. Support
+# happens here, on the company's own site, so an order from any channel has to
+# be answerable from one place. The channel is not cosmetic: it decides how a
+# return is filed and where a refund lands, which is what shoppers ask about.
+Channel = Literal["website", "shopee", "lazada", "tiktok_shop"]
+
+# Shown to shoppers and written into prompts. The marketplaces brand themselves
+# the same way in Vietnamese and English, so one label serves both.
+CHANNEL_LABELS = {
+    "website": "Northlight.vn",
+    "shopee": "Shopee",
+    "lazada": "Lazada",
+    "tiktok_shop": "TikTok Shop",
+}
+
 OrderStatus = Literal[
     "pending",
     "confirmed",
@@ -174,9 +191,19 @@ class Order(BaseModel):
     verifies a caller by hashing what they supply and comparing, so the tool can
     confirm identity without the database holding a readable phone number and
     without the model ever seeing one.
+
+    Every order carries an internal `order_code` regardless of where it was
+    placed, so one code space covers the whole business. Marketplace orders
+    additionally keep the code that platform issued.
     """
 
     order_code: str
+    # The marketplace's own order code, when the order came from one.
+    #
+    # Shoppers quote whichever code they were shown, which on a marketplace is
+    # never the internal one. `get_order_status` therefore matches on either.
+    channel: Channel = "website"
+    channel_order_code: str | None = None
     customer_name: str
     phone_hash: str
     phone_last4: str  # Shown back to the user as a masked confirmation only.

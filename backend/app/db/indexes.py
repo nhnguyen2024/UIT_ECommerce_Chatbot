@@ -119,7 +119,13 @@ async def ensure_regular_indexes() -> list[str]:
     created += ["policies.chunk_id", "policies.policy_type"]
 
     await db[schema.ORDERS].create_index("order_code", unique=True)
-    created += ["orders.order_code"]
+    # Sparse: website orders have no marketplace code, and a plain unique index
+    # would treat all of their missing values as one colliding null.
+    await db[schema.ORDERS].create_index(
+        "channel_order_code", unique=True, sparse=True
+    )
+    await db[schema.ORDERS].create_index("channel")
+    created += ["orders.order_code", "orders.channel_order_code", "orders.channel"]
 
     await db[schema.CONVERSATIONS].create_index("session_id", unique=True)
     await db[schema.CONVERSATIONS].create_index("updated_at")

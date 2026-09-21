@@ -111,6 +111,48 @@ Expected refund timing:
 
 If the customer exchanges for a different product, any price difference is either collected or refunded accordingly.
 
+## [marketplace-returns] Đổi trả đơn mua trên sàn thương mại điện tử | Returns for marketplace orders
+
+@vi
+Northlight bán hàng trên website chính thức và trên các sàn Shopee, Lazada, TikTok Shop. Đơn mua trên sàn được đổi trả theo quy trình của sàn đó, không gửi trực tiếp về cửa hàng.
+
+- Đơn Shopee: gửi yêu cầu trong mục "Trả hàng/Hoàn tiền" trên ứng dụng Shopee, trong vòng 15 ngày kể từ khi nhận hàng.
+- Đơn Lazada: gửi yêu cầu trong mục "Đơn hàng của tôi" trên ứng dụng Lazada, trong vòng 15 ngày kể từ khi nhận hàng.
+- Đơn TikTok Shop: gửi yêu cầu trong mục "Đơn mua" trên ứng dụng TikTok Shop, trong vòng 7 ngày kể từ khi nhận hàng.
+- Đơn website: áp dụng thời hạn và quy trình nêu tại mục Thời hạn đổi trả và Quy trình yêu cầu đổi trả.
+
+Bảo hành sản phẩm không phụ thuộc vào nơi đặt hàng. Sản phẩm mua trên sàn vẫn được bảo hành theo đúng điều kiện tại Chính sách bảo hành.
+
+@en
+Northlight sells on its official website and on the Shopee, Lazada, and TikTok Shop marketplaces. Orders placed on a marketplace are returned through that marketplace's own process, not sent directly to the store.
+
+- Shopee orders: file the request under "Return/Refund" in the Shopee app, within 15 days of delivery.
+- Lazada orders: file the request under "My Orders" in the Lazada app, within 15 days of delivery.
+- TikTok Shop orders: file the request under "My Orders" in the TikTok Shop app, within 7 days of delivery.
+- Website orders: the window and process in the Return window and How to request a return sections apply.
+
+Warranty does not depend on where the order was placed. A product bought on a marketplace carries the same warranty terms set out in the Warranty Policy.
+
+## [marketplace-refunds] Hoàn tiền cho đơn mua trên sàn | Refunds for marketplace orders
+
+@vi
+Tiền hoàn của đơn mua trên sàn do sàn chi trả, không do cửa hàng chuyển khoản trực tiếp. Tiền về ví của sàn hoặc về phương thức thanh toán ban đầu theo quy định của từng sàn, nên thời gian hoàn có thể khác với mục Thời gian và hình thức hoàn tiền.
+
+- Đơn Shopee: tiền về Ví ShopeePay hoặc phương thức thanh toán ban đầu, thường trong 7 đến 14 ngày làm việc kể từ khi Shopee duyệt yêu cầu.
+- Đơn Lazada: tiền về Ví Lazada hoặc phương thức thanh toán ban đầu, thường trong 7 đến 15 ngày làm việc.
+- Đơn TikTok Shop: tiền về phương thức thanh toán ban đầu, thường trong 5 đến 14 ngày làm việc.
+
+Cửa hàng không thể tra cứu hay can thiệp vào ví Shopee, Lazada hoặc TikTok Shop của khách hàng. Nếu yêu cầu đã được sàn duyệt mà quá thời hạn nêu trên vẫn chưa nhận được tiền, khách hàng liên hệ bộ phận hỗ trợ của chính sàn đó.
+
+@en
+Refunds for marketplace orders are paid by the marketplace, not transferred directly by the store. Money is returned to that platform's wallet or to the original payment method under that platform's own rules, so the timing may differ from the Refund timing and method section.
+
+- Shopee orders: refunded to the ShopeePay wallet or the original payment method, typically 7 to 14 working days after Shopee approves the request.
+- Lazada orders: refunded to the Lazada wallet or the original payment method, typically 7 to 15 working days.
+- TikTok Shop orders: refunded to the original payment method, typically 5 to 14 working days.
+
+The store cannot inspect or intervene in a customer's Shopee, Lazada, or TikTok Shop wallet. If the marketplace has approved the request and the money has still not arrived within the times above, the customer should contact that marketplace's own support team.
+
 ## [rejection-grounds] Trường hợp từ chối đổi trả | Grounds for rejecting a return
 
 @vi
