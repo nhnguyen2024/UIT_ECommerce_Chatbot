@@ -73,7 +73,7 @@ export class InsightsComponent {
   });
   readonly worstDelivery = computed(() => (this.data()?.delivery ?? []).slice(0, 6));
   readonly policyTopics = computed(() =>
-    (this.data()?.chatbot ?? []).filter((r) => r.intent === 'policy_question').sort((a, b) => b.escalation_rate - a.escalation_rate),
+    (this.data()?.chatbot ?? []).filter((r) => r.intent === 'policy_question' && r.policy_topic !== '-').sort((a, b) => b.escalation_rate - a.escalation_rate),
   );
 
   constructor() {

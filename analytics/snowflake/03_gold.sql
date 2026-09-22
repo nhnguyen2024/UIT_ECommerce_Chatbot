@@ -12,7 +12,7 @@ USE DATABASE NORTHLIGHT_DW;
 CREATE OR REPLACE DYNAMIC TABLE GOLD.CUSTOMER_RFM
   TARGET_LAG = '1 hour' WAREHOUSE = NL_WH
 AS
-WITH asof AS (SELECT MAX(created_at) AS d FROM SILVER.ORDERS),
+WITH as_of AS (SELECT MAX(created_at) AS d FROM SILVER.ORDERS),
 ranked AS (
     SELECT o.*, ROW_NUMBER() OVER (PARTITION BY customer_key ORDER BY created_at) AS n
     FROM SILVER.ORDERS o WHERE customer_key IS NOT NULL
@@ -31,17 +31,17 @@ agg AS (
     FROM ranked GROUP BY customer_key
 )
 SELECT a.*,
-       DATEDIFF('day', a.last_order_at, asof.d) AS recency_days,
+       DATEDIFF('day', a.last_order_at, as_of.d) AS recency_days,
        a.orders > 1 AS is_repeat,
        CASE
-           WHEN a.orders >= 4 AND DATEDIFF('day', a.last_order_at, asof.d) <= 90 THEN 'Champions'
-           WHEN a.orders >= 2 AND DATEDIFF('day', a.last_order_at, asof.d) <= 120 THEN 'Loyal'
+           WHEN a.orders >= 4 AND DATEDIFF('day', a.last_order_at, as_of.d) <= 90 THEN 'Champions'
+           WHEN a.orders >= 2 AND DATEDIFF('day', a.last_order_at, as_of.d) <= 120 THEN 'Loyal'
            WHEN a.orders >= 2 THEN 'At risk'
-           WHEN DATEDIFF('day', a.last_order_at, asof.d) <= 60 THEN 'New'
-           WHEN DATEDIFF('day', a.last_order_at, asof.d) <= 180 THEN 'One-time, winnable'
+           WHEN DATEDIFF('day', a.last_order_at, as_of.d) <= 60 THEN 'New'
+           WHEN DATEDIFF('day', a.last_order_at, as_of.d) <= 180 THEN 'One-time, winnable'
            ELSE 'Lost'
        END AS segment
-FROM agg a, asof;
+FROM agg a, as_of;
 
 -- 2. What drives a second purchase ---------------------------------------------
 CREATE OR REPLACE DYNAMIC TABLE GOLD.REPEAT_DRIVERS
@@ -249,7 +249,7 @@ SELECT 'delivery' AS area, 'operations' AS owner, 1 AS priority,
        'Giao trễ làm giảm tỷ lệ mua lại' AS finding,
        'Khách có đơn đầu giao trễ mua lại ' || TO_VARCHAR(ROUND(late.late * 100)) || '% so với '
          || TO_VARCHAR(ROUND(late.on_time * 100)) || '% khi đúng hạn. Chậm nhất: ' || w.carrier || ' ở miền '
-         || w.region || ' (' || TO_VARCHAR(ROUND(w.late_rate * 100)) || '% đơn trễ).' AS evidence,
+         || DECODE(w.region, 'north', 'Bắc', 'central', 'Trung', 'south', 'Nam', w.region) || ' (' || TO_VARCHAR(ROUND(w.late_rate * 100)) || '% đơn trễ).' AS evidence,
        'Đổi hãng vận chuyển cho khu vực này; chatbot chủ động báo trễ và xin lỗi kèm voucher.' AS action
 FROM late, worst_carrier w
 UNION ALL
@@ -265,7 +265,7 @@ SELECT 'chatbot', 'support', 2, 'Chủ đề chính sách chưa có câu trả l
 FROM policy_gap
 UNION ALL
 SELECT 'channel', 'marketing', 3, 'Chuyển khách mua lại về website',
-       f.channel || ' thu phí ' || TO_VARCHAR(ROUND(f.fee_share * 100)) || '% doanh thu; tỷ lệ mua lại '
+       DECODE(f.channel, 'shopee', 'Shopee', 'lazada', 'Lazada', 'tiktok_shop', 'TikTok Shop', f.channel) || ' thu phí ' || TO_VARCHAR(ROUND(f.fee_share * 100)) || '% doanh thu; tỷ lệ mua lại '
          || TO_VARCHAR(ROUND(f.repeat_rate * 100)) || '% so với website ' || TO_VARCHAR(ROUND(s.repeat_rate * 100)) || '%.',
        'Voucher mua lần hai trên website cho khách mua lần đầu trên sàn; chatbot nhắc voucher khi khách tra cứu đơn.'
 FROM fees f, site s
@@ -276,7 +276,7 @@ SELECT 'retention', 'marketing', 2, 'Khách mua một lần có thể kéo lại
 FROM winback
 UNION ALL
 SELECT 'pricing', 'merchandising', 3, 'Thiếu sản phẩm ở mức giá khách hỏi',
-       category || ' dưới ' || TO_VARCHAR(budget_vnd / 1000000) || ' triệu: ' || asks || ' lượt hỏi, chỉ '
+       category || ' dưới ' || TO_VARCHAR(ROUND(budget_vnd / 1000000)::INT) || ' triệu: ' || asks || ' lượt hỏi, chỉ '
          || products_in_budget || ' sản phẩm còn hàng.',
        'Bổ sung sản phẩm hoặc khuyến mãi ở mức giá này.'
 FROM price;

@@ -76,7 +76,7 @@ SELECT 'shopee' AS channel,
             WHEN 'COMPLETED' THEN 'delivered' WHEN 'CANCELLED' THEN 'cancelled'
             WHEN 'TO_RETURN' THEN 'returned' WHEN 'SHIPPED' THEN 'shipped'
             WHEN 'READY_TO_SHIP' THEN 'packing' ELSE 'pending' END AS platform_status,
-       TO_TIMESTAMP_LTZ(payload:create_time::NUMBER) AS created_at,
+       TO_TIMESTAMP_LTZ(payload:create_time::NUMBER)::TIMESTAMP_LTZ AS created_at,
        payload:total_amount::NUMBER AS gross_vnd,
        payload:escrow:commission_fee::NUMBER + payload:escrow:service_fee::NUMBER AS platform_fees_vnd
 FROM SILVER.RAW_LATEST WHERE source = 'shopee' AND dataset = 'orders'
@@ -87,7 +87,7 @@ SELECT 'lazada',
             WHEN 'delivered' THEN 'delivered' WHEN 'canceled' THEN 'cancelled'
             WHEN 'returned' THEN 'returned' WHEN 'shipped' THEN 'shipped'
             WHEN 'ready_to_ship' THEN 'packing' WHEN 'packed' THEN 'packing' ELSE 'pending' END,
-       TRY_TO_TIMESTAMP_TZ(payload:created_at::STRING, 'YYYY-MM-DD"T"HH24:MI:SS TZHTZM'),
+       TRY_TO_TIMESTAMP_TZ(payload:created_at::STRING, 'YYYY-MM-DD"T"HH24:MI:SS TZHTZM')::TIMESTAMP_LTZ,
        TRY_TO_NUMBER(payload:price::STRING, 18, 2)::NUMBER,
        payload:fees:commission::NUMBER + payload:fees:payment_fee::NUMBER
 FROM SILVER.RAW_LATEST WHERE source = 'lazada' AND dataset = 'orders'

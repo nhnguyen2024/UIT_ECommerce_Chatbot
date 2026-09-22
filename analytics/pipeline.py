@@ -154,7 +154,8 @@ def snowflake_run() -> None:
             print(f"  {script}: {head}")
     # Dynamic tables refresh on their lag; force one refresh now so results are immediate.
     cur.execute("SHOW DYNAMIC TABLES IN DATABASE NORTHLIGHT_DW")
-    names = [(row[2], row[1]) for row in cur.fetchall()]  # (schema, name)
+    columns = [c[0].lower() for c in cur.description]
+    names = [(row[columns.index("schema_name")], row[columns.index("name")]) for row in cur.fetchall()]
     order = ["RAW_LATEST", "ORDERS", "ORDER_ITEMS", "MARKETPLACE_ORDERS", "REVIEWS", "LISTING_STATS",
              "WEB_EVENTS", "CHAT_TURNS", "PRODUCTS", "CUSTOMER_RFM", "REPEAT_DRIVERS", "CHANNEL_PERFORMANCE",
              "CHANNEL_MIGRATION", "DEMAND_GAPS", "PRICE_GAPS", "DELIVERY_PERFORMANCE", "REVIEW_THEMES",

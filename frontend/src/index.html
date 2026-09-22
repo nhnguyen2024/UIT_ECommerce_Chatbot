@@ -2,6 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <!-- Resolves assets from the site root, so a reload on /shop/AUD-002 or
+         /admin/insights still finds styles.css and config.js. -->
+    <base href="/" />
     <title>Northlight Support</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="Northlight support: product advice, store policies, and order tracking across Northlight.vn, Shopee, Lazada, and TikTok Shop." />
@@ -12,7 +15,7 @@
   </head>
   <body>
     <!-- Runtime settings, loaded before the app: see public/config.js. -->
-    <script src="config.js"></script>
+    <script src="/config.js"></script>
     <app-root></app-root>
   </body>
 </html>
