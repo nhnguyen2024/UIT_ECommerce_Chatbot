@@ -32,10 +32,18 @@ CLIENT_ID="$(az identity show -n "$IDENTITY" -g "$RESOURCE_GROUP" --query client
 SUBSCRIPTION="$(az account show --query id -o tsv)"
 TENANT="$(az account show --query tenantId -o tsv)"
 
-az identity federated-credential create -n "github-$BRANCH" --identity-name "$IDENTITY" -g "$RESOURCE_GROUP" \
-  --issuer "https://token.actions.githubusercontent.com" \
-  --subject "repo:$REPO:ref:refs/heads/$BRANCH" \
-  --audiences "api://AzureADTokenExchange" --output none
+# GitHub now puts the owner's and repository's numeric IDs into the token's
+# subject (repo:owner@<id>/name@<id>:ref:...), so Azure must trust that exact
+# string; the plain form is kept for repositories still on the old format.
+OWNER_ID="$(curl -fsS "https://api.github.com/repos/$REPO" | python3 -c 'import sys,json;print(json.load(sys.stdin)["owner"]["id"])')"
+REPO_ID="$(curl -fsS "https://api.github.com/repos/$REPO" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')"
+trust() {
+  az identity federated-credential create -n "$1" --identity-name "$IDENTITY" -g "$RESOURCE_GROUP" \
+    --issuer "https://token.actions.githubusercontent.com" --subject "$2" \
+    --audiences "api://AzureADTokenExchange" --output none
+}
+trust "github-$BRANCH" "repo:${REPO}:ref:refs/heads/${BRANCH}"
+trust "github-$BRANCH-ids" "repo:${REPO%%/*}@${OWNER_ID}/${REPO#*/}@${REPO_ID}:ref:refs/heads/${BRANCH}"
 
 assign() {
   az role assignment create --role "$1" --assignee-object-id "$PRINCIPAL" \
