@@ -105,6 +105,13 @@ Confirm retrieval works before involving the model:
 .venv/bin/python -m seed.smoke
 ```
 
+Optionally, add a month of realistic demo activity for the dashboard (chats,
+tickets, website orders), all marked `is_simulated`:
+
+```bash
+.venv/bin/python -m seed.activity           # --clear removes it again
+```
+
 ## 5. Run it
 
 Two terminals.

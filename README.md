@@ -88,7 +88,7 @@ backend/
 frontend/
   src/app/chat/          Chat page and streaming client
   src/app/admin/         Operations dashboard
-infra/                   Azure deployment scripts, docker compose
+infra/                   Azure deployment scripts (backend, frontend, analytics job, GitHub OIDC)
 docs/                    Setup guide
 ```
 
@@ -116,6 +116,8 @@ cp .env.example .env      # then set MONGODB_URI and the model provider's creden
 ```
 
 This generates the catalogue, orders, and policy chunks, writes them to MongoDB, creates the indexes, and waits until the search indexes are queryable. Generation is deterministic, so re-running reproduces identical data and any SKU or citation referenced by the evaluation set stays valid.
+
+For a demo, `python -m seed.activity` adds 30 days of realistic store activity (chats in Vietnamese and English, telemetry, staff tickets, website orders) so the Operations dashboard and the analytics extract have something to show. Every document it writes is marked `is_simulated: true`; `--clear` removes exactly those.
 
 ## Development
 

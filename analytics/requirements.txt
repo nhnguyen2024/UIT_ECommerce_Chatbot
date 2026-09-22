@@ -1,7 +1,4 @@
-# Analytics pipeline only; the chatbot backend does not need these.
-pymongo>=4.8
-certifi>=2024.2
-snowflake-connector-python>=3.12
+# Local development of the analytics pipeline: what the Azure job needs, plus
+# pydantic for simulate.py, which builds its history from the seed catalogue.
+-r requirements-job.txt
 pydantic>=2.7
-pydantic-settings>=2.3
-matplotlib>=3.9

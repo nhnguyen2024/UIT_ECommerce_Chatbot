@@ -242,8 +242,8 @@ Redeploy: **push to `main`**; GitHub Actions tests, builds the images on its
 runners, and updates the Container App, the job and the Static Web App (only the
 parts that changed; "Run workflow" with deploy_all rebuilds everything). It needs
 three repository variables, `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`,
-`AZURE_SUBSCRIPTION_ID` (values printed by `infra/setup-github-oidc.sh`; kept
-locally in `Code/github_actions_variables.txt`). Manual fallback from a machine
+`AZURE_SUBSCRIPTION_ID` (values printed by `infra/setup-github-oidc.sh`; stored
+in the GitHub repository settings). Manual fallback from a machine
 with Docker: `REGISTRY=acruitchatbot6435 BUILD_MODE=local ./infra/deploy-backend.sh`,
 `BACKEND_URL=<backend> ./infra/deploy-frontend.sh`, `./infra/deploy-analytics.sh`.
 **Staff pages (`/admin`, `/admin/insights`) require sign-in** (US19, done
@@ -282,7 +282,8 @@ Also fixed: missing `<base href>` broke deep links on the deployed site.
 - `DEMO_GUIDE.md`: filming script, including the Insights (analytics loop) step.
 - `TOOLS_GUIDE.md`: beginner's explanation of every tool and configuration.
 - `jira_backlog.csv`: backlog import for Jira Free (the PM tool).
-- `_generators/`: Python scripts that rebuild the reports, figures and slides.
+- `_generators/`: Python scripts that rebuild the reports, figures and slides (the v1
+  report generator was removed; `part3.py` remains because it holds the backlog).
 - `BaoCao_DoAn_QTDA_Chatbot.docx`: old v1 PM report, superseded.
 
 Roles as the developer described them: first PM + idea/BA = [Thành viên 4] (then
@@ -322,7 +323,7 @@ backend/
   evals/       dataset/*.jsonl, scoring, judges, run_eval, report
   tests/
 frontend/src/app/{chat,admin}/
-infra/         Azure deploy scripts, docker compose
+infra/         Azure deploy scripts (backend, frontend, analytics job, GitHub OIDC)
   snowflake/setup.sql   one-time Cortex credential setup
 ```
 
@@ -532,6 +533,16 @@ report.
 - **Update this file with every change**, in the same commit.
 
 ## 8. Changelog
+
+**2026-09-22 (evening), demo data and clean-up.** Deleted all test traffic from
+Atlas (3 "Trần Demo" checkout orders with their stock restored, 22 conversations,
+27 events, 25 tickets; backup kept outside the repo). Added `seed/activity.py`:
+30 days of realistic activity marked `is_simulated: true` (about 990 chats, 1,220
+turns shaped like measured telemetry, 49 tickets, 89 website orders); replace with
+`python -m seed.activity`, remove with `--clear`. 9 tests. Removed
+`infra/docker-compose.yml` (CI builds the images), the unused `matplotlib` and
+`pydantic-settings` from `analytics/requirements.txt` (it now reuses
+`requirements-job.txt`), the v1 report generator and the stray root `.venv`.
 
 **2026-09-22 (afternoon, audit).** Full check: 377 tests, production build,
 script syntax, workflow YAML; live E2E on Azure (shop → checkout → assistant →
