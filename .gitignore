@@ -12,9 +12,20 @@ dist/
 
 # Environment: never commit real credentials
 .env
-.env.local
+.env.*
 *.env
 !.env.example
+
+# Keys, certificates and anything named as a secret. Secrets live only in the
+# git-ignored .env files, Azure Key Vault and Container Apps secrets.
+*.pem
+*.key
+*.pfx
+*.p12
+*secret*.json
+*secrets*.txt
+*.tfvars
+github_actions_variables*.txt
 
 # Node / Angular
 node_modules/
