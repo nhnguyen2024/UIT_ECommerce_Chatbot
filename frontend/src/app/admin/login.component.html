@@ -1,0 +1,21 @@
+<main class="page login">
+  <p class="eyebrow">Staff only</p>
+  <h1 class="title">Sign in to Operations</h1>
+  <p class="muted">The Operations and Insights pages show costs, shopper questions and business figures, so they need the staff password. The shop and the assistant stay open to everyone.</p>
+
+  <form class="form" (ngSubmit)="submit()">
+    <fieldset>
+      <label>Staff password
+        <input name="password" type="password" [(ngModel)]="password" required autocomplete="current-password" autofocus />
+      </label>
+    </fieldset>
+
+    @if (error()) {
+      <p class="alert" role="alert">{{ error() }}</p>
+    }
+
+    <button type="submit" class="primary wide" [disabled]="busy() || !password">
+      {{ busy() ? 'Signing in…' : 'Sign in' }}
+    </button>
+  </form>
+</main>

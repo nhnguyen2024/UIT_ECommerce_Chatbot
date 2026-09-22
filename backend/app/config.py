@@ -103,6 +103,12 @@ class Settings(BaseSettings):
         "http://127.0.0.1:4200",
     ]
 
+    # --- Staff pages -------------------------------------------------------
+    # Password for the Operations and Insights pages (app/api/auth.py). Unset
+    # means those pages stay locked (503), never open.
+    admin_password: SecretStr | None = None
+    admin_session_hours: int = 12
+
     # --- Behaviour ---------------------------------------------------------
     # Order lookups must match a contact detail. This is the number of trailing
     # phone digits a customer has to supply. See app/agent/tools/orders.py.

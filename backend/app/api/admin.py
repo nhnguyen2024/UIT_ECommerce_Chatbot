@@ -4,21 +4,22 @@ Everything here reads the `events` collection, one row per user turn, using
 aggregation pipelines. The dashboard therefore never scans conversation
 transcripts, which keeps it fast as history grows.
 
-These endpoints are unauthenticated in this build. Before this is exposed
-anywhere public, put authentication in front of the router: the summary reveals
-operating cost and the review queue quotes shopper messages.
+Every route requires a signed-in staff session (app/api/auth.py): the summary
+reveals operating cost, the review queue quotes shopper messages, and the
+insights carry business figures.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from app.api.auth import require_admin
 from app.db import schema
 from app.db.client import get_db
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
 
 def _since(days: int) -> datetime:

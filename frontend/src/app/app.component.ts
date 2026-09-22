@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { AuthService } from './admin/auth.service';
 import { CartService } from './shop/cart.service';
 import { ThemeService } from './theme.service';
 
@@ -16,6 +17,13 @@ export class AppComponent {
   private readonly themes = inject(ThemeService);
   readonly theme = this.themes.theme;
   readonly cart = inject(CartService);
+  readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+
+  signOut(): void {
+    this.auth.logout();
+    this.router.navigateByUrl('/shop');
+  }
 
   toggleTheme(): void {
     this.themes.toggle();

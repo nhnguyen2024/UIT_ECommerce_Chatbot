@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { adminGuard } from './admin/auth.service';
 
 /**
  * Every page is lazily loaded. The dashboard pulls in chart geometry and table
@@ -12,12 +13,19 @@ export const routes: Routes = [
     title: 'Northlight Support',
   },
   {
+    path: 'admin/login',
+    loadComponent: () => import('./admin/login.component').then((m) => m.LoginComponent),
+    title: 'Northlight · Staff sign-in',
+  },
+  {
     path: 'admin',
+    canActivate: [adminGuard],
     loadComponent: () => import('./admin/admin.component').then((m) => m.AdminComponent),
     title: 'Northlight Support · Operations',
   },
   {
     path: 'admin/insights',
+    canActivate: [adminGuard],
     loadComponent: () => import('./admin/insights.component').then((m) => m.InsightsComponent),
     title: 'Northlight · Insights',
   },

@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pymongo.errors import PyMongoError
 
-from app.api import admin, chat, health, shop
+from app.api import admin, auth, chat, health, shop
 from app.config import get_settings
 from app.db.client import close_client, ping
 
@@ -89,4 +89,5 @@ async def handle_database_error(request: Request, exc: PyMongoError) -> JSONResp
 app.include_router(health.router)
 app.include_router(chat.router)
 app.include_router(shop.router)
+app.include_router(auth.router)
 app.include_router(admin.router)

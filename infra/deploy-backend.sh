@@ -66,6 +66,16 @@ LLM_PROVIDER="${LLM_PROVIDER:-anthropic}"
 SECRETS=("mongodb-uri=$MONGODB_URI")
 PROVIDER_ENV=("LLM_PROVIDER=$LLM_PROVIDER")
 
+# Staff password for Operations and Insights (US19). Without it those pages
+# stay locked, so a missing value is a warning rather than an error.
+ADMIN_PASSWORD="$(read_env ADMIN_PASSWORD || true)"
+if [[ -n "$ADMIN_PASSWORD" && "$ADMIN_PASSWORD" != "..." ]]; then
+  SECRETS+=("admin-password=$ADMIN_PASSWORD")
+  PROVIDER_ENV+=("ADMIN_PASSWORD=secretref:admin-password")
+else
+  echo "warning: ADMIN_PASSWORD not set; the staff pages will stay locked" >&2
+fi
+
 case "$LLM_PROVIDER" in
   anthropic)
     ANTHROPIC_API_KEY="$(read_env ANTHROPIC_API_KEY)"
