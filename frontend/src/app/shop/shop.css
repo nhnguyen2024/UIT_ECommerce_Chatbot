@@ -305,13 +305,6 @@ fieldset input:not([type='radio']) {
 fieldset input.ng-invalid.ng-touched { border-color: var(--status-bad); }
 fieldset p { margin: 0; }
 fieldset label.radio { flex-direction: row; align-items: center; gap: 9px; color: var(--ink); font-size: 14px; }
-.demo {
-  font-size: 12px;
-  color: var(--status-warn);
-  padding: 7px 10px;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--status-warn) 10%, transparent);
-}
 
 .order-summary {
   padding: 16px 18px;
