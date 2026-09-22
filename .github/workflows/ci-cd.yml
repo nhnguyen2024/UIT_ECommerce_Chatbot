@@ -1,0 +1,119 @@
+# Test every push and pull request; on main, build the images in GitHub's
+# runners and deploy to Azure. Nothing is built on a developer machine.
+#
+# Why GitHub Actions builds the images: Azure for Students blocks ACR Tasks
+# (Azure's own image builder), so the build needs a machine with Docker, and a
+# GitHub runner is one.
+#
+# Azure login uses OpenID Connect with a managed identity (infra/setup-github-oidc.sh):
+# GitHub proves which repository and branch is asking, Azure trusts that claim,
+# and no password or key is stored in GitHub. The three IDs below are repository
+# variables (Settings > Secrets and variables > Actions > Variables), not secrets.
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      deploy_all:
+        description: Rebuild and deploy every part, not only what changed
+        type: boolean
+        default: true
+
+permissions:
+  id-token: write   # the OIDC token for azure/login
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  RESOURCE_GROUP: rg-uit-chatbot
+  REGISTRY: acruitchatbot6435
+  API_APP: uit-chatbot-api
+  ANALYTICS_JOB: nl-analytics-job
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Backend tests
+        working-directory: backend
+        run: |
+          pip install -e ".[dev]"
+          python -m pytest -q
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Frontend build
+        working-directory: frontend
+        run: |
+          npm ci
+          npx ng build --configuration production
+
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: changed
+        with:
+          filters: |
+            backend:   ['backend/**']
+            analytics: ['analytics/**']
+            frontend:  ['frontend/**', 'infra/deploy-frontend.sh']
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Registry login
+        if: steps.changed.outputs.backend == 'true' || steps.changed.outputs.analytics == 'true' || inputs.deploy_all
+        run: az acr login --name "$REGISTRY"
+
+      - name: Backend image and Container App
+        if: steps.changed.outputs.backend == 'true' || inputs.deploy_all
+        run: |
+          az extension add --name containerapp --upgrade --only-show-errors
+          IMAGE="$REGISTRY.azurecr.io/chatbot-api:${GITHUB_SHA::7}"
+          docker build --tag "$IMAGE" backend
+          docker push "$IMAGE"
+          az containerapp update --name "$API_APP" --resource-group "$RESOURCE_GROUP" --image "$IMAGE" --output none
+          echo "Deployed $IMAGE" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Analytics image and scheduled job
+        if: steps.changed.outputs.analytics == 'true' || inputs.deploy_all
+        run: |
+          az extension add --name containerapp --upgrade --only-show-errors
+          IMAGE="$REGISTRY.azurecr.io/nl-analytics:${GITHUB_SHA::7}"
+          docker build --tag "$IMAGE" analytics
+          docker push "$IMAGE"
+          az containerapp job update --name "$ANALYTICS_JOB" --resource-group "$RESOURCE_GROUP" --image "$IMAGE" --output none
+          echo "Deployed $IMAGE" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Frontend to Static Web Apps
+        if: steps.changed.outputs.frontend == 'true' || inputs.deploy_all
+        run: |
+          az extension add --name containerapp --upgrade --only-show-errors
+          FQDN="$(az containerapp show --name "$API_APP" --resource-group "$RESOURCE_GROUP" \
+            --query properties.configuration.ingress.fqdn --output tsv)"
+          BACKEND_URL="https://$FQDN" ./infra/deploy-frontend.sh
