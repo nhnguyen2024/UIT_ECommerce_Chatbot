@@ -273,11 +273,11 @@ Also fixed: missing `<base href>` broke deep links on the deployed site.
   `Code/ref/Kế hoạch dự án (CheckMeIn)_Final_vP.pdf` plus chapters 4–5 for the
   doc_requirement items. Approach: SDLC = Scrum, project frame tailored with predictive
   tools (deliverable WBS, milestones, CPM, cost baseline), justified by the three
-  required factors. 7 of 12 registered risks occurred. Contribution by completed story
-  points: 90.3 / 3.5 / 3.5 / 2.7 %.
+  required factors. 7 of 12 registered risks occurred. 14 change requests (CR00–CR13).
+  Contribution by completed story points: 91.3 / 3.2 / 3.2 / 2.4 %.
 - `BaoCao_DoAn_Chatbot_SanPham.docx`: Đồ án report (product and architecture).
 - `Slides_QLDA_Chatbot_VI.pptx` (Vietnamese, primary) and `Slides_QLDA_Chatbot_EN.pptx`:
-  32-slide PM presentation (management, delivered product, risks and problems), with
+  33-slide PM presentation (management, delivered product, risks and problems), with
   speaker notes.
 - `DEMO_GUIDE.md`: filming script, including the Insights (analytics loop) step.
 - `TOOLS_GUIDE.md`: beginner's explanation of every tool and configuration.
@@ -460,9 +460,14 @@ analytical split). Not designed yet.
 - The developer adds the three GitHub repository variables; then the first
   Actions run deploys. Until then the deploy job fails at `azure/login` (tests
   still run).
-- PM report and both slide decks: move the schedule to the 2026-10-06 deadline
-  (currently planned to 20/10), add CR11 (analytics to Azure), CR12 (CI/CD) and
-  US19 done; burndown and contributions to be recomputed.
+- ~~PM report and slide decks to the 2026-10-06 deadline~~ **done 2026-09-22:**
+  CR11 (analytics to Azure, US23), CR12 (CI/CD, US24), CR13 (official deadline
+  06/10, schedule compressed: Sprint 4 22–28/09, Sprint 5 29/09–06/10, buffer
+  04–05/10). Backlog 139 SP, 126 done, 13 open (US20, US22). Contributions by
+  completed SP: 91.3 / 3.2 / 3.2 / 2.4 %. Both decks have a new slide 17 on the
+  schedule compression. `Code/jira_backlog.csv` updated (US19, US21, US23, US24 Done).
+- Remaining: US20 multi-turn evaluation (Could, by 28/09); US22 report, slides,
+  video, rehearsal (by 03/10).
 - Placeholders (names, student IDs, supervisor) are filled by the developer.
 
 ### Backlog (after the above)
