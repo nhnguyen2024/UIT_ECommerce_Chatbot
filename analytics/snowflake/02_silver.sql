@@ -15,14 +15,26 @@ USE DATABASE NORTHLIGHT_DW;
 
 -- Latest copy of each raw record. A file loaded twice (or re-extracted) must
 -- not double-count orders.
+--  * Marketplace and history sources land once: drop exact duplicate records.
+--  * The live app (source = app) is exported as a full snapshot on every
+--    scheduled run, so only its newest snapshot counts; otherwise an order whose
+--    status changed would appear once per snapshot.
 CREATE OR REPLACE DYNAMIC TABLE SILVER.RAW_LATEST
   TARGET_LAG = '1 hour' WAREHOUSE = NL_WH
 AS
 SELECT source, dataset, extract_dt, payload, loaded_at
 FROM BRONZE.RAW_EVENTS
+WHERE source <> 'app'
 QUALIFY ROW_NUMBER() OVER (
     PARTITION BY source, dataset, HASH(payload)
-    ORDER BY loaded_at DESC) = 1;
+    ORDER BY loaded_at DESC) = 1
+UNION ALL
+SELECT source, dataset, extract_dt, payload, loaded_at
+FROM BRONZE.RAW_EVENTS
+WHERE source = 'app'
+QUALIFY DENSE_RANK() OVER (
+    PARTITION BY dataset
+    ORDER BY extract_dt DESC, loaded_at DESC) = 1;
 
 -- Orders: the seller's order system (OMS) is the backbone, one row per order
 -- from any channel. The app's live orders are the same shape.

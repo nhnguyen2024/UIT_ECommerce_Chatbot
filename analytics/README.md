@@ -22,7 +22,7 @@ Website clickstream ──────┘                     │ external stage
 | Layer | What it holds | Why |
 |---|---|---|
 | **Lake** | JSON exactly as extracted, partitioned by source, dataset and date | Cheap, replayable; nothing is lost if a later step is wrong |
-| **Bronze** (`BRONZE.RAW_EVENTS`) | Every record as a VARIANT, with its file name and load time | Loaded incrementally by `COPY INTO` (which skips files it already loaded) and an hourly task |
+| **Bronze** (`BRONZE.RAW_EVENTS`) | Every record as a VARIANT, with its file name and load time | Loaded incrementally by `COPY INTO` (which skips files it already loaded), run by the hourly Azure job |
 | **Silver** | Typed, deduplicated, unified tables: orders, items, marketplace orders, reviews, listing stats, web events, chat turns, products | The three marketplaces use different field names, status codes and time formats; Silver maps them to one vocabulary |
 | **Gold** | One mart per business question, plus `INSIGHT_ACTIONS` | What the business reads, and what goes back into the app |
 
@@ -53,6 +53,15 @@ inputs change, within the target lag, so there is no scheduler to maintain.
 - The simulation plants a few relationships on purpose (late deliveries lower ratings and repeat purchases; some asked-for products aren't stocked; one carrier is slow in central provinces; instalment questions have no policy). The gold layer's job is to recover them. **These are demonstrations of the pipeline, not findings about a real business.**
 
 ## Running it
+
+In production the loop runs **hourly in Azure** as a Container Apps Job
+(`infra/deploy-analytics.sh`): `pipeline.py scheduled` extracts from the app,
+uploads to the lake with the job's managed identity, redeploys the SQL if the
+scripts changed, loads new files into bronze, refreshes silver and gold, and
+writes gold back to MongoDB. Secrets come from Key Vault. Run it now with
+`./infra/deploy-analytics.sh run`.
+
+Locally, for development:
 
 ```bash
 python3 -m venv analytics/.venv && analytics/.venv/bin/pip install -r analytics/requirements.txt

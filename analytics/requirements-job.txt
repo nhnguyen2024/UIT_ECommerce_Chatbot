@@ -1,0 +1,7 @@
+# What the scheduled Azure job needs (analytics/Dockerfile). The full
+# requirements.txt adds the simulator's and charts' libraries.
+pymongo>=4.8
+certifi>=2024.2
+snowflake-connector-python>=3.12
+azure-identity>=1.17
+azure-storage-blob>=12.20

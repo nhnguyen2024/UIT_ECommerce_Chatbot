@@ -51,8 +51,10 @@ FROM (
 PATTERN = '.*[.]json'
 ON_ERROR = 'CONTINUE';
 
--- Keep new files flowing in without anyone running COPY by hand. Suspended by
--- default; pipeline.py resumes it after the first successful load.
+-- Fallback schedule inside Snowflake. The hourly Azure Container Apps Job
+-- (pipeline.py scheduled) runs this same COPY right after it uploads, then
+-- refreshes silver and gold, so the task stays suspended to avoid waking the
+-- warehouse twice. Resume it only if the loop runs without the Azure job.
 CREATE OR REPLACE TASK BRONZE.LOAD_FROM_LAKE
   WAREHOUSE = NL_WH
   SCHEDULE = 'USING CRON 0 * * * * Asia/Ho_Chi_Minh'

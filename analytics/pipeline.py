@@ -3,8 +3,14 @@
     analytics/.venv/bin/python analytics/pipeline.py all        # every step below
     analytics/.venv/bin/python analytics/pipeline.py extract    # app data -> analytics/out/raw
     analytics/.venv/bin/python analytics/pipeline.py upload     # analytics/out/raw -> Azure Data Lake
-    analytics/.venv/bin/python analytics/pipeline.py snowflake  # bronze -> silver -> gold
+    analytics/.venv/bin/python analytics/pipeline.py snowflake  # (re)deploy bronze/silver/gold SQL, refresh
+    analytics/.venv/bin/python analytics/pipeline.py load       # new lake files -> bronze (COPY)
+    analytics/.venv/bin/python analytics/pipeline.py refresh    # refresh silver and gold now
     analytics/.venv/bin/python analytics/pipeline.py feedback   # gold -> app (insights)
+    analytics/.venv/bin/python analytics/pipeline.py scheduled  # extract, upload, ensure_sql, load, refresh, feedback
+
+In production "scheduled" runs hourly as an Azure Container Apps Job
+(infra/deploy-analytics.sh). Nothing in the loop depends on a developer machine.
 
 The loop:
 
@@ -12,8 +18,10 @@ The loop:
         ──COPY──> Snowflake BRONZE ──> SILVER ──> GOLD
         ──feedback──> MongoDB `insights` ──> Operations dashboard, and new eval cases
 
-Secrets come from analytics/.env (the lake) and backend/.env (MongoDB). The
-Snowflake token and the SAS token are never printed.
+Settings come from environment variables. In Azure the job receives them from
+Key Vault through its managed identity, and reaches the lake with that identity
+(no storage key). Locally they are read from analytics/.env and backend/.env.
+The Snowflake token and the SAS token are never printed.
 """
 
 from __future__ import annotations
@@ -23,12 +31,11 @@ import json
 import os
 import pathlib
 import re
-import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent
 REPO = ROOT.parent
-OUT = ROOT / "out" / "raw"
+OUT = pathlib.Path(os.environ.get("ANALYTICS_OUT", ROOT / "out")) / "raw"
 SQL = ROOT / "snowflake"
 
 
@@ -42,7 +49,7 @@ def load_env(path: pathlib.Path) -> dict[str, str]:
     return values
 
 
-ENV = {**load_env(REPO / "backend" / ".env"), **load_env(ROOT / ".env")}
+ENV = {**load_env(REPO / "backend" / ".env"), **load_env(ROOT / ".env"), **os.environ}
 
 
 # --- extract: the live app's data --------------------------------------------------------
@@ -59,7 +66,7 @@ def extract() -> None:
     uri = ENV["MONGODB_URI"]
     db = MongoClient(uri, tlsCAFile=certifi.where() if uri.startswith("mongodb+srv") else None)[
         ENV.get("MONGODB_DB", "uit_ecommerce_chatbot")]
-    today = dt.date.today().isoformat()
+    today = dt.datetime.now(dt.timezone(dt.timedelta(hours=7))).date().isoformat()
 
     def write(dataset: str, rows) -> None:
         path = OUT / "source=app" / dataset / f"dt={today}"
@@ -108,13 +115,27 @@ def extract() -> None:
 
 # --- upload: to the lake -------------------------------------------------------------------
 def upload() -> None:
-    subprocess.run(
-        ["az", "storage", "fs", "directory", "upload", "-f", ENV["ADLS_CONTAINER"],
-         "--account-name", ENV["ADLS_ACCOUNT"], "--account-key", ENV["ADLS_KEY"],
-         "-s", f"{OUT}/*", "-d", "raw", "--recursive", "-o", "none"],
-        check=True,
-    )
-    print("  uploaded analytics/out/raw -> lake/raw")
+    """Copy every file under out/raw to lake/raw, keeping the source=/dataset/dt= layout.
+
+    With ADLS_KEY set (a developer machine) the account key is used. Without it
+    (the Azure job) the managed identity is used, which holds only the
+    "Storage Blob Data Contributor" role on this account.
+    """
+    from azure.storage.blob import BlobServiceClient
+
+    if ENV.get("ADLS_KEY"):
+        credential = ENV["ADLS_KEY"]
+    else:
+        from azure.identity import DefaultAzureCredential
+        credential = DefaultAzureCredential()
+    service = BlobServiceClient(f"https://{ENV['ADLS_ACCOUNT']}.blob.core.windows.net", credential=credential)
+    container = service.get_container_client(ENV["ADLS_CONTAINER"])
+    count = 0
+    for path in sorted(OUT.rglob("*.json")):
+        with open(path, "rb") as fh:
+            container.upload_blob(f"raw/{path.relative_to(OUT).as_posix()}", fh, overwrite=True)
+        count += 1
+    print(f"  uploaded {count} files -> {ENV['ADLS_CONTAINER']}/raw")
 
 
 # --- snowflake: bronze, silver, gold ---------------------------------------------------------
@@ -137,7 +158,7 @@ def statements(sql_text: str):
     """Split a script on semicolons at line ends; comments and blanks dropped."""
     sql_text = sql_text.replace("{{ADLS_ACCOUNT}}", ENV["ADLS_ACCOUNT"]) \
                        .replace("{{ADLS_CONTAINER}}", ENV["ADLS_CONTAINER"]) \
-                       .replace("{{ADLS_SAS}}", ENV["ADLS_SAS"].lstrip("?"))
+                       .replace("{{ADLS_SAS}}", ENV.get("ADLS_SAS", "").lstrip("?"))
     lines = [line for line in sql_text.splitlines() if not line.strip().startswith("--")]
     for chunk in re.split(r";\s*\n", "\n".join(lines) + "\n"):
         if chunk.strip():
@@ -145,6 +166,7 @@ def statements(sql_text: str):
 
 
 def snowflake_run() -> None:
+    """Deploy the bronze/silver/gold definitions, then refresh. Needed only when the SQL changes."""
     conn = connect()
     cur = conn.cursor()
     for script in ("01_bronze.sql", "02_silver.sql", "03_gold.sql"):
@@ -152,7 +174,60 @@ def snowflake_run() -> None:
             head = " ".join(stmt.split())[:70]
             cur.execute(stmt)
             print(f"  {script}: {head}")
-    # Dynamic tables refresh on their lag; force one refresh now so results are immediate.
+    conn.close()
+    refresh()
+
+
+def sql_version() -> str:
+    import hashlib
+    digest = hashlib.sha256()
+    for script in ("01_bronze.sql", "02_silver.sql", "03_gold.sql"):
+        digest.update((SQL / script).read_bytes())
+    return digest.hexdigest()[:16]
+
+
+def ensure_sql() -> None:
+    """Redeploy the SQL only when the files in this image differ from what Snowflake runs.
+
+    The deployed version is a hash of the three scripts, kept in
+    BRONZE.PIPELINE_META. A SQL change therefore goes live on the first
+    scheduled run after CI/CD ships the new image, with no manual step, and an
+    unchanged image never rebuilds the dynamic tables.
+    """
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute("CREATE TABLE IF NOT EXISTS BRONZE.PIPELINE_META (key STRING, value STRING, updated_at TIMESTAMP_LTZ)")
+    cur.execute("SELECT value FROM BRONZE.PIPELINE_META WHERE key = 'sql_version'")
+    row = cur.fetchone()
+    conn.close()
+    version = sql_version()
+    if row and row[0] == version:
+        print(f"  SQL up to date ({version})")
+        return
+    print(f"  SQL changed ({row[0] if row else 'none'} -> {version}); redeploying")
+    snowflake_run()
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM BRONZE.PIPELINE_META WHERE key = 'sql_version'")
+    cur.execute("INSERT INTO BRONZE.PIPELINE_META VALUES ('sql_version', %s, CURRENT_TIMESTAMP())", (version,))
+    conn.close()
+
+
+def load() -> None:
+    """Load new lake files into bronze. COPY skips files it has already loaded."""
+    copy = next(stmt for stmt in statements((SQL / "01_bronze.sql").read_text()) if stmt.startswith("COPY INTO"))
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute(copy)
+    loaded = [row for row in cur.fetchall() if len(row) > 1 and row[1] == "LOADED"]
+    print(f"  bronze: {len(loaded)} new files loaded")
+    conn.close()
+
+
+def refresh() -> None:
+    """Refresh silver and gold in dependency order, so results are current when feedback runs."""
+    conn = connect()
+    cur = conn.cursor()
     cur.execute("SHOW DYNAMIC TABLES IN DATABASE NORTHLIGHT_DW")
     columns = [c[0].lower() for c in cur.description]
     names = [(row[columns.index("schema_name")], row[columns.index("name")]) for row in cur.fetchall()]
@@ -164,7 +239,6 @@ def snowflake_run() -> None:
         for schema, table in names:
             if table == name:
                 cur.execute(f"ALTER DYNAMIC TABLE {schema}.{table} REFRESH")
-    cur.execute("ALTER TASK BRONZE.LOAD_FROM_LAKE RESUME")
     for table in ("BRONZE.RAW_EVENTS", "SILVER.ORDERS", "SILVER.CHAT_TURNS", "GOLD.CUSTOMER_RFM",
                   "GOLD.INSIGHT_ACTIONS"):
         cur.execute(f"SELECT COUNT(*) FROM {table}")
@@ -211,12 +285,16 @@ def feedback() -> None:
     db = MongoClient(uri, tlsCAFile=certifi.where() if uri.startswith("mongodb+srv") else None)[
         ENV.get("MONGODB_DB", "uit_ecommerce_chatbot")]
     db.insights.insert_one(doc)
-    print("  wrote insights document")
+    # One document per run; a week of hourly runs is enough history.
+    removed = db.insights.delete_many({"generated_at": {"$lt": doc["generated_at"] - dt.timedelta(days=7)}})
+    print(f"  wrote insights document ({removed.deleted_count} older than 7 days removed)")
 
 
 if __name__ == "__main__":
     step = sys.argv[1] if len(sys.argv) > 1 else "all"
-    steps = {"extract": [extract], "upload": [upload], "snowflake": [snowflake_run], "feedback": [feedback],
+    steps = {"extract": [extract], "upload": [upload], "snowflake": [snowflake_run], "load": [load],
+             "refresh": [refresh], "feedback": [feedback],
+             "scheduled": [extract, upload, ensure_sql, load, refresh, feedback],
              "all": [extract, upload, snowflake_run, feedback]}[step]
     for fn in steps:
         print(f"==> {fn.__name__}")
