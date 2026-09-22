@@ -232,15 +232,24 @@ The cache hit rate is the one to watch during development. If it falls to zero,
 something volatile has entered the prompt prefix and caching has silently
 stopped, which raises cost several-fold without any visible symptom.
 
-The admin router has **no authentication** in this build. Put a gate in front of
-it before exposing it anywhere public: the summary reveals operating cost and
-the review queue quotes shopper messages.
+The admin router requires staff sign-in (`app/api/auth.py`): one password,
+`ADMIN_PASSWORD`, and a stateless 12-hour session token. Without a configured
+password the staff pages stay locked (503), never open.
 
 ## Deployment
+
+Pushing to `main` deploys: [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml)
+runs the tests, builds the images on GitHub's runners, and updates the Container
+App, the analytics job and the Static Web App. It signs in to Azure with OpenID
+Connect through a managed identity (`infra/setup-github-oidc.sh`, run once), so no
+password or key is stored in GitHub.
+
+Manual deployment from a machine with Docker:
 
 ```bash
 LOCATION=eastasia REGISTRY=<registry name> BUILD_MODE=local ./infra/deploy-backend.sh
 BACKEND_URL=https://<printed url> ./infra/deploy-frontend.sh
+./infra/deploy-analytics.sh        # Key Vault, managed identity, hourly analytics job
 ```
 
 The backend runs on Azure Container Apps, scaled to zero so an idle demo costs

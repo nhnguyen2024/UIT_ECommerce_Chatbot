@@ -756,12 +756,32 @@ any IPv4 address, the same trade-off made for Atlas network access.
 
 ---
 
+### Analytics job, secrets and CI/CD
+
+The analytics loop runs as an Azure Container Apps Job, hourly, in its own
+Workload Profiles environment (the backend's Express environment does not
+support jobs). The job has a user-assigned managed identity: it reads its
+secrets from Key Vault and writes to the data lake through a role assignment,
+so no storage key or password is handed to it. Its image carries the Snowflake
+SQL; each run compares a hash of those scripts with the version recorded in
+Snowflake and redeploys only when they differ. Gold results are copied into
+MongoDB rather than queried live, so the website never wakes the warehouse and
+never holds warehouse credentials.
+
+GitHub Actions builds and deploys on every push to `main`. Azure for Students
+blocks ACR Tasks, so images are built on GitHub's runners; the workflow signs in
+to Azure with OpenID Connect through a managed identity with a federated
+credential scoped to this repository's `main` branch, because student tenants
+do not allow app registrations.
+
 ## 12. Known limitations
 
 Stated plainly, because a defence goes better when the author raises these first.
 
-**The admin dashboard has no authentication.** It exposes operating cost and
-quotes shopper messages. It needs a gate before any public exposure.
+**Staff sign-in is a single shared password.** The Operations and Insights pages
+require it (stateless HMAC session tokens, fail-closed when unconfigured), but
+there are no per-user accounts or roles; a real deployment would use Microsoft
+Entra ID.
 
 **All data is synthetic.** The catalogue, orders, and policy documents were
 generated or written for this project.

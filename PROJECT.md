@@ -3,7 +3,7 @@
 Working notes for this repository. Read this first; it is written so that a
 session can pick up the work without scanning the codebase.
 
-Last updated: **2026-09-22** (overnight session). Keep this file current with every change.
+Last updated: **2026-09-22** (afternoon: analytics job on Azure, staff sign-in, CI/CD). Keep this file current with every change.
 
 ---
 
@@ -13,8 +13,10 @@ A university capstone (**Đồ án 2**, UIT). The chatbot is the deliverable and
 will be defended in front of a committee, so the written record matters as much
 as the code: `docs/architecture.md` is structured to map onto report chapters.
 
-**Deadline: the defense is within about one month of 2026-09-21.** Every choice
-below is weighed against that. A working, measured system beats a larger one.
+**Deadlines (hard):** the **Đồ án** report is due **2026-09-23**; the **IT Project
+Management (Quản lý dự án CNTT)** submission and defence are on **2026-10-06**.
+Every choice below is weighed against that. A working, measured system beats a
+larger one.
 
 **Objective being satisfied, verbatim:**
 
@@ -229,15 +231,24 @@ console errors; deep links, `/admin`, CORS checked).
 | Part | Where |
 |---|---|
 | Website | https://green-forest-04d91f300.5.azurestaticapps.net (Static Web App `uit-chatbot-web`, Free, eastasia) |
-| Backend | https://uit-chatbot-api.politemeadow-22cd5252.eastasia.azurecontainerapps.io (Container App `uit-chatbot-api`, env `cae-uit-chatbot`, scale 0–2) |
+| Backend | https://uit-chatbot-api.politemeadow-22cd5252.eastasia.azurecontainerapps.io (Container App `uit-chatbot-api`, env `cae-uit-chatbot` (Express), scale 0–2) |
+| Analytics job | Container Apps Job `nl-analytics-job`, env `cae-uit-jobs` (Workload Profiles; Express envs refuse jobs), cron `5 * * * *` UTC |
+| Secrets | Key Vault `kv-uit-chatbot-6435` (RBAC) read by managed identity `id-nl-analytics`; backend uses Container Apps secrets (incl. `admin-password`) |
+| CI/CD | `.github/workflows/ci-cd.yml`; Azure login by OIDC through managed identity `id-github-deploy` (federated credential for `main`) |
 | Registry | `acruitchatbot6435` (Basic, ~5 USD/month, the only fixed cost) |
 | CORS | `CORS_ORIGINS` set to the website origin |
 
-Redeploy: `LOCATION=eastasia REGISTRY=acruitchatbot6435 BUILD_MODE=local
-./infra/deploy-backend.sh` (Docker Desktop running), then `BACKEND_URL=<backend>
-./infra/deploy-frontend.sh`. The SWA upload downloads a client binary; over the
-phone hotspot it timed out once and succeeded on retry. **The public `/admin`
-has no authentication** (backlog item 1); the data is synthetic.
+Redeploy: **push to `main`**; GitHub Actions tests, builds the images on its
+runners, and updates the Container App, the job and the Static Web App (only the
+parts that changed; "Run workflow" with deploy_all rebuilds everything). It needs
+three repository variables, `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`,
+`AZURE_SUBSCRIPTION_ID` (values printed by `infra/setup-github-oidc.sh`; kept
+locally in `Code/github_actions_variables.txt`). Manual fallback from a machine
+with Docker: `REGISTRY=acruitchatbot6435 BUILD_MODE=local ./infra/deploy-backend.sh`,
+`BACKEND_URL=<backend> ./infra/deploy-frontend.sh`, `./infra/deploy-analytics.sh`.
+**Staff pages (`/admin`, `/admin/insights`) require sign-in** (US19, done
+2026-09-22); the password is `ADMIN_PASSWORD` in `backend/.env` and the
+Container Apps secret `admin-password`. The data is synthetic.
 
 **ANALYTICS PIPELINE (2026-09-22): done and live.** `analytics/` — chatbot/shop →
 Azure Data Lake Gen2 (`stuitchatbotlake6435`, container `lake`) → Snowflake
@@ -246,7 +257,13 @@ Azure Data Lake Gen2 (`stuitchatbotlake6435`, container `lake`) → Snowflake
 records) → SILVER (5,317 orders, 4,096 chat turns) → 12 GOLD marts incl.
 `INSIGHT_ACTIONS` (8 actions) → MongoDB `insights` → `/admin/insights` (live on the
 deployed site). The exposed chat token was revoked by `00_admin_setup.sql`.
-Re-run: `analytics/.venv/bin/python analytics/pipeline.py all`. Gold recovers the
+**Runs in Azure, hourly (CR11, 2026-09-22):** `pipeline.py scheduled` =
+extract → upload (managed identity, no storage key) → `ensure_sql` (redeploys
+the SQL when the hash of the scripts in the image differs from
+`BRONZE.PIPELINE_META`) → COPY → refresh silver/gold → feedback (keeps 7 days of
+`insights` documents). The Snowflake task `LOAD_FROM_LAKE` stays suspended (the
+job runs the COPY). Silver `RAW_LATEST` now keeps only the newest app snapshot.
+Run now: `./infra/deploy-analytics.sh run`. Local runs still work from `.env`. Gold recovers the
 planted patterns (late first delivery → repeat 26% vs 44%; J&T central 94% late;
 gaming handheld / security camera / air purifier demand; instalment 56% escalated).
 Also fixed: missing `<base href>` broke deep links on the deployed site.
@@ -438,11 +455,21 @@ analytical split). Not designed yet.
 **Week 4:** report, demo rehearsal, and a backup plan: switching
 `LLM_PROVIDER=anthropic` if the trial runs out.
 
+### Open items (2026-09-22 afternoon)
+
+- The developer adds the three GitHub repository variables; then the first
+  Actions run deploys. Until then the deploy job fails at `azure/login` (tests
+  still run).
+- PM report and both slide decks: move the schedule to the 2026-10-06 deadline
+  (currently planned to 20/10), add CR11 (analytics to Azure), CR12 (CI/CD) and
+  US19 done; burndown and contributions to be recomputed.
+- Placeholders (names, student IDs, supervisor) are filled by the developer.
+
 ### Backlog (after the above)
 
-1. **Authenticate the admin router.** `app/api/admin.py` has no gate; it exposes
-   operating cost and quotes shopper messages. Undecided: shared-secret header vs.
-   Azure Container Apps auth.
+1. ~~Authenticate the admin router~~ **done 2026-09-22 (US19):** one staff
+   password, stateless HMAC session token (12 h), `app/api/auth.py`, 14 tests;
+   Entra ID if real per-user accounts are ever needed.
 2. **Channel breakdown on the dashboard.** `orders.channel` is indexed; only the
    aggregation in `admin.py` and the Angular component are missing.
 3. **Multi-turn eval cases.** Every case is one message with empty history, so
@@ -494,6 +521,23 @@ report.
 - **Update this file with every change**, in the same commit.
 
 ## 8. Changelog
+
+**2026-09-22 (afternoon), everything in the cloud; staff sign-in; CI/CD.**
+Analytics pipeline moved off the developer machine (CR11): Azure Container Apps
+Job (hourly) with a user-assigned managed identity, secrets in Key Vault (RBAC),
+lake access by role instead of the account key, upload via the Storage SDK
+instead of the `az` CLI, self-migrating SQL (hash in `BRONZE.PIPELINE_META`;
+`az containerapp job start --image/--command` overrides drop every env var, so a
+manual "deploy SQL" execution was not an option). Found on the way: the
+backend's environment is Express, which refuses jobs, and the CLI now creates
+Express environments unless `--environment-mode WorkloadProfiles` is passed;
+`Microsoft.KeyVault` had to be registered. Silver `RAW_LATEST` keeps only the
+latest app snapshot so hourly re-exports never double-count. US19 staff sign-in
+(backend dependency on the whole admin router, fail-closed 503 when no password
+is configured; Angular login page, guard, interceptor, sign-out; browser-tested).
+GitHub Actions CI/CD with OIDC through a managed identity (student tenants block
+app registrations). Đồ án report updated (deployment figure, §4.7–4.9, results,
+limitations, appendix). 377 tests pass.
 
 **2026-09-22 (overnight), evaluation, map, storefront, deploy fixes.** First full
 eval run (66% pass); judge calibrated (re-grading the same answers: 91%), then
