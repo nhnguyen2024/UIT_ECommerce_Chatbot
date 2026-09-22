@@ -468,6 +468,15 @@ analytical split). Not designed yet.
   schedule compression. `Code/jira_backlog.csv` updated (US19, US21, US23, US24 Done).
 - Remaining: US20 multi-turn evaluation (Could, by 28/09); US22 report, slides,
   video, rehearsal (by 03/10).
+- **GitHub Actions deploy not yet passing (2026-09-22 afternoon):** tests pass on
+  GitHub; the deploy job's `azure/login` fails. The IDs now arrive (the developer
+  stored them), but `az login` exits 1. The Azure side is verified (federated
+  credential subject `repo:nhnguyen2024/UIT_ECommerce_Chatbot:ref:refs/heads/main`,
+  AcrPush + RG Contributor), so the stored values are the suspect. Needs the log
+  lines above "Login failed" from the Actions UI.
+- **Decision pending:** 9 commits from 2026-09-09/10 (already on GitHub) carry a
+  `Co-Authored-By` trailer. Removing it means a history rewrite (dates kept) and a
+  force-push; do it only on the developer's explicit go-ahead.
 - Placeholders (names, student IDs, supervisor) are filled by the developer.
 
 ### Backlog (after the above)
@@ -526,6 +535,16 @@ report.
 - **Update this file with every change**, in the same commit.
 
 ## 8. Changelog
+
+**2026-09-22 (afternoon, audit).** Full check: 377 tests, production build,
+script syntax, workflow YAML; live E2E on Azure (shop → checkout → assistant →
+map) and 8 chatbot cases (product, policy, verified and wrong-phone order,
+marketplace code, injection, out of scope, English) all correct; the hourly job
+ran on schedule and succeeded. Fixed: stale setup/deploy docs, SQL comments, the
+empty-Insights hint, test and endpoint counts (377 tests, 18 endpoints) in
+docs and reports, a quoting bug that had kept the PM report from rebuilding, the
+tenant ID in PROJECT.md. Workflow now reads the Azure IDs from variables or
+secrets and uses Node 24 action versions.
 
 **2026-09-22 (afternoon), everything in the cloud; staff sign-in; CI/CD.**
 Analytics pipeline moved off the developer machine (CR11): Azure Container Apps
