@@ -457,9 +457,6 @@ analytical split). Not designed yet.
 
 ### Open items (2026-09-22 afternoon)
 
-- The developer adds the three GitHub repository variables; then the first
-  Actions run deploys. Until then the deploy job fails at `azure/login` (tests
-  still run).
 - ~~PM report and slide decks to the 2026-10-06 deadline~~ **done 2026-09-22:**
   CR11 (analytics to Azure, US23), CR12 (CI/CD, US24), CR13 (official deadline
   06/10, schedule compressed: Sprint 4 22–28/09, Sprint 5 29/09–06/10, buffer
@@ -468,12 +465,12 @@ analytical split). Not designed yet.
   schedule compression. `Code/jira_backlog.csv` updated (US19, US21, US23, US24 Done).
 - Remaining: US20 multi-turn evaluation (Could, by 28/09); US22 report, slides,
   video, rehearsal (by 03/10).
-- **GitHub Actions deploy not yet passing (2026-09-22 afternoon):** tests pass on
-  GitHub; the deploy job's `azure/login` fails. The IDs now arrive (the developer
-  stored them), but `az login` exits 1. The Azure side is verified (federated
-  credential subject `repo:nhnguyen2024/UIT_ECommerce_Chatbot:ref:refs/heads/main`,
-  AcrPush + RG Contributor), so the stored values are the suspect. Needs the log
-  lines above "Login failed" from the Actions UI.
+- ~~GitHub Actions deploy failing at azure/login~~ **fixed 2026-09-22:** GitHub now
+  sends the OIDC subject with numeric IDs
+  (`repo:nhnguyen2024@187094840/UIT_ECommerce_Chatbot@1362677050:ref:refs/heads/main`);
+  a second federated credential (`github-main-ids`) trusts it, and
+  `setup-github-oidc.sh` creates both forms. First full CI/CD run green (tests,
+  login, backend, analytics job, website); live checks pass on the CI-built image.
 - **Decision pending:** 9 commits from 2026-09-09/10 (already on GitHub) carry a
   `Co-Authored-By` trailer. Removing it means a history rewrite (dates kept) and a
   force-push; do it only on the developer's explicit go-ahead.
