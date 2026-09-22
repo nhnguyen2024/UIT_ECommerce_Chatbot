@@ -8,7 +8,7 @@
 # Prerequisites:
 #   az login
 #   az extension add --name staticwebapp --upgrade
-#   npm install -g @azure/static-web-apps-cli
+#   (optional) npm install -g @azure/static-web-apps-cli; otherwise npx runs it
 #
 # Usage:
 #   BACKEND_URL=https://your-api.azurecontainerapps.io ./infra/deploy-frontend.sh
@@ -82,7 +82,14 @@ TOKEN="$(az staticwebapp secrets list --name "$APP_NAME" --resource-group "$RESO
   --query 'properties.apiKey' --output tsv)"
 
 echo "==> Uploading"
-swa deploy "$OUTPUT_DIR" --deployment-token "$TOKEN" --env production
+# Use an installed swa CLI if there is one; otherwise run it through npx rather
+# than requiring a global install.
+if command -v swa >/dev/null 2>&1; then
+  SWA=(swa)
+else
+  SWA=(npx --yes @azure/static-web-apps-cli)
+fi
+"${SWA[@]}" deploy "$OUTPUT_DIR" --deployment-token "$TOKEN" --env production
 
 HOSTNAME="$(az staticwebapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" \
   --query defaultHostname --output tsv)"

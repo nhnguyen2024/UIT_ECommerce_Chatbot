@@ -222,6 +222,23 @@ model's search queries), tool selection, groundedness and security 100%, 0
 errors, about 0.12–0.13 USD per full run and ~13 s per turn. Eval spend to date
 is about 1.05 USD of the 3 USD the developer allowed.
 
+**DEPLOY STATUS (2026-09-22): live on Azure, verified end to end** (shop → cart →
+checkout → order created → assistant tracks it with the map, in a browser, no
+console errors; deep links, `/admin`, CORS checked).
+
+| Part | Where |
+|---|---|
+| Website | https://green-forest-04d91f300.5.azurestaticapps.net (Static Web App `uit-chatbot-web`, Free, eastasia) |
+| Backend | https://uit-chatbot-api.politemeadow-22cd5252.eastasia.azurecontainerapps.io (Container App `uit-chatbot-api`, env `cae-uit-chatbot`, scale 0–2) |
+| Registry | `acruitchatbot6435` (Basic, ~5 USD/month, the only fixed cost) |
+| CORS | `CORS_ORIGINS` set to the website origin |
+
+Redeploy: `LOCATION=eastasia REGISTRY=acruitchatbot6435 BUILD_MODE=local
+./infra/deploy-backend.sh` (Docker Desktop running), then `BACKEND_URL=<backend>
+./infra/deploy-frontend.sh`. The SWA upload downloads a client binary; over the
+phone hotspot it timed out once and succeeded on retry. **The public `/admin`
+has no authentication** (backlog item 1); the data is synthetic.
+
 **Features added 2026-09-21 (night):** order route map (warehouse → hubs →
 destination province, `app/geo.py`, `order-map.component`); storefront with
 catalogue, product page showing which channels list the product, cart, guest
@@ -365,7 +382,7 @@ local Docker Desktop, pinned to `linux/amd64`, and pushes. Docker must be runnin
 4. ~~Run the full evaluation~~ (done 2026-09-22; `docs/evaluation.md` holds the
    run history and the numbers for the report. Per-run output in
    `backend/evals/results/` is git-ignored on purpose).
-5. Deploy: see the DEPLOY STATUS line in §5 for where it stands.
+5. ~~Deploy~~ (done 2026-09-22; URLs in §5, DEPLOY STATUS).
 6. Added on request 2026-09-21: order route map; storefront with cart and guest
    checkout (demo payment, no accounts). Done.
 
@@ -454,7 +471,8 @@ pass over two identical runs, all in `docs/evaluation.md`. Added the order route
 Trường Sa) and the storefront (catalogue with channel listings, cart, guest
 checkout, confirmation handing the order to the assistant). Fixed the frontend
 deploy (runtime `config.js` + CORS) and added `BUILD_MODE=local` for the
-student subscription's ACR Tasks block. Committed in logical commits, not pushed.
+student subscription's ACR Tasks block. Deployed and verified on Azure.
+Committed in logical commits, not pushed.
 
 **2026-09-21, first end-to-end run; two chat UI fixes.** Atlas payment method
 added, lifting the embedding limit; `seed.smoke` passes all 24 checks. Real turns
