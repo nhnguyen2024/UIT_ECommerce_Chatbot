@@ -28,3 +28,8 @@ dist/
 
 # Evaluation output
 backend/evals/results/
+
+# Analytics pipeline output and credentials
+analytics/out/
+analytics/.env
+analytics/.venv/

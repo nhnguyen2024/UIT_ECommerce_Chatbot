@@ -17,6 +17,11 @@ export const routes: Routes = [
     title: 'Northlight Support · Operations',
   },
   {
+    path: 'admin/insights',
+    loadComponent: () => import('./admin/insights.component').then((m) => m.InsightsComponent),
+    title: 'Northlight · Insights',
+  },
+  {
     path: 'shop',
     loadComponent: () => import('./shop/catalog.component').then((m) => m.CatalogComponent),
     title: 'Northlight · Shop',

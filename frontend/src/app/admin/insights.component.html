@@ -1,0 +1,156 @@
+<main class="page">
+  <header class="head">
+    <div>
+      <span class="eyebrow">Operations · Analytics</span>
+      <h1>Customer &amp; marketplace <em>insights</em></h1>
+      @if (data()?.generated_at) {
+        <p class="sub">
+          Computed in Snowflake (gold layer), {{ data()!.generated_at | date: 'dd/MM/yyyy HH:mm' }}
+          @if (data()!.includes_simulated_history) { <span class="badge">includes simulated history</span> }
+        </p>
+      }
+    </div>
+  </header>
+
+  <!-- The loop, stated once at the top so every panel below reads in its light. -->
+  <ol class="loop" aria-label="Closed loop">
+    <li><strong>Chatbot &amp; shop</strong><span>conversations, orders, marketplace data</span></li>
+    <li><strong>Azure Data Lake</strong><span>raw JSON, by date</span></li>
+    <li><strong>Snowflake</strong><span>Bronze → Silver → Gold</span></li>
+    <li><strong>Actions</strong><span>back to each team, and to the chatbot</span></li>
+  </ol>
+
+  @if (error()) {
+    <p class="alert" role="alert">{{ error() }}</p>
+  } @else if (data() === null) {
+    <p class="muted">Loading insights…</p>
+  } @else if (empty()) {
+    <div class="empty">
+      <p>No analytics yet. Run the pipeline: <code>analytics/.venv/bin/python analytics/pipeline.py all</code></p>
+    </div>
+  } @else {
+    <section class="panel">
+      <div class="panel-head"><span class="eyebrow">Recommended actions</span><span class="hint">from GOLD.INSIGHT_ACTIONS</span></div>
+      <div class="actions">
+        @for (a of data()!.actions ?? []; track $index) {
+          <article class="action" [attr.data-priority]="a.priority">
+            <div class="action-top">
+              <span class="area">{{ area(a.area) }}</span>
+              <span class="owner">{{ a.owner }} · P{{ a.priority }}</span>
+            </div>
+            <strong>{{ a.finding }}</strong>
+            <p class="evidence">{{ a.evidence }}</p>
+            <p class="do">→ {{ a.action }}</p>
+          </article>
+        }
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><span class="eyebrow">Marketplaces compared</span><span class="hint">delivered GMV, fees, repeat purchase, ratings</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Channel</th><th>GMV</th><th class="num">Orders</th><th class="num">AOV</th><th class="num">Fees</th>
+              <th class="num">Cancel</th><th class="num">Late</th><th class="num">Repeat</th><th class="num">Rating</th></tr>
+          </thead>
+          <tbody>
+            @for (c of data()!.channels ?? []; track c.channel) {
+              <tr>
+                <td>{{ channel(c.channel) }}</td>
+                <td class="barcell"><span class="bar" [style.width]="width(c.gmv_vnd, maxGmv())"></span>{{ vnd(c.gmv_vnd) }}</td>
+                <td class="num">{{ c.orders }}</td>
+                <td class="num">{{ vnd(c.aov_vnd) }}</td>
+                <td class="num">{{ pct(c.fee_share) }}</td>
+                <td class="num">{{ pct(c.cancel_rate) }}</td>
+                <td class="num">{{ pct(c.late_rate) }}</td>
+                <td class="num strong">{{ pct(c.repeat_rate) }}</td>
+                <td class="num">{{ c.avg_rating == null ? '–' : num(c.avg_rating) + ' ★' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="panel">
+        <div class="panel-head"><span class="eyebrow">What drives a second purchase</span></div>
+        @for (g of drivers(); track g.driver) {
+          <div class="driver">
+            <span class="driver-name">{{ g.label }}</span>
+            @for (r of g.rows; track r.bucket) {
+              <div class="hbar">
+                <span class="label">{{ channel(r.bucket) }}</span>
+                <span class="track"><span class="fill" [style.width]="pct(r.repeat_rate, 1)"></span></span>
+                <span class="value">{{ pct(r.repeat_rate) }}</span>
+              </div>
+            }
+          </div>
+        }
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><span class="eyebrow">Customer segments (RFM)</span></div>
+        @for (s of data()!.segments ?? []; track s.segment) {
+          <div class="hbar">
+            <span class="label">{{ s.segment }}</span>
+            <span class="track"><span class="fill alt" [style.width]="width(s.customers, maxSegment())"></span></span>
+            <span class="value">{{ s.customers }}</span>
+          </div>
+        }
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><span class="eyebrow">Asked for, not stocked</span><span class="hint">from chatbot questions</span></div>
+        @for (g of data()!.demand_gaps ?? []; track $index) {
+          <div class="hbar">
+            <span class="label" [title]="g.item">{{ g.item }}</span>
+            <span class="track"><span class="fill warn" [style.width]="width(g.asks, maxGap())"></span></span>
+            <span class="value">{{ g.asks }}</span>
+          </div>
+        }
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><span class="eyebrow">Review themes</span><span class="hint">Shopee · Lazada · TikTok Shop</span></div>
+        @for (t of data()!.review_themes ?? []; track t.theme) {
+          <div class="hbar">
+            <span class="label">{{ t.theme }}</span>
+            <span class="track"><span class="fill" [class.bad]="t.avg_rating < 3.5" [style.width]="width(t.reviews, maxTheme())"></span></span>
+            <span class="value">{{ num(t.avg_rating) }}★</span>
+          </div>
+        }
+      </section>
+    </div>
+
+    <div class="grid">
+      <section class="panel">
+        <div class="panel-head"><span class="eyebrow">Slowest carrier × region</span></div>
+        <table class="compact">
+          <thead><tr><th>Carrier</th><th>Region</th><th class="num">Late</th><th class="num">Days</th><th class="num">Tracking chats / order</th><th class="num">Rating</th></tr></thead>
+          <tbody>
+            @for (d of worstDelivery(); track $index) {
+              <tr><td>{{ d.carrier }}</td><td>{{ d.region }}</td><td class="num strong">{{ pct(d.late_rate) }}</td>
+                <td class="num">{{ num(d.avg_days) }}</td><td class="num">{{ num(d.tracking_chats_per_order, 2) }}</td>
+                <td class="num">{{ d.avg_rating == null ? '–' : num(d.avg_rating) }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><span class="eyebrow">Chatbot: policy topics</span><span class="hint">improves the bot itself</span></div>
+        <table class="compact">
+          <thead><tr><th>Topic</th><th class="num">Turns</th><th class="num">Escalated</th><th class="num">Ungrounded</th></tr></thead>
+          <tbody>
+            @for (c of policyTopics(); track c.policy_topic) {
+              <tr><td>{{ c.policy_topic }}</td><td class="num">{{ c.turns }}</td>
+                <td class="num strong">{{ pct(c.escalation_rate) }}</td><td class="num">{{ pct(c.ungrounded_rate) }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </section>
+    </div>
+  }
+</main>

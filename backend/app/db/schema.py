@@ -27,6 +27,8 @@ CUSTOMERS = "customers"
 CONVERSATIONS = "conversations"
 EVENTS = "events"
 HANDOFFS = "handoffs"
+# Written by analytics/pipeline.py from the Snowflake gold layer.
+INSIGHTS = "insights"
 
 
 # --- Shared enums ----------------------------------------------------------

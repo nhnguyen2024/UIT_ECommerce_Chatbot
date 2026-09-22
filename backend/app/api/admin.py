@@ -194,3 +194,15 @@ async def review_queue(days: int = Query(7, ge=1, le=90), limit: int = Query(50,
         .sort("at", -1)
         .to_list(limit)
     )
+
+
+@router.get("/insights")
+async def insights() -> dict:
+    """The latest analytics results written back from Snowflake's gold layer.
+
+    analytics/pipeline.py (step "feedback") inserts one document per run; the
+    newest one is returned. An empty response means the pipeline has not run
+    yet, which the page shows as such rather than as an error.
+    """
+    document = await get_db()[schema.INSIGHTS].find_one({}, {"_id": 0}, sort=[("generated_at", -1)])
+    return document or {}
