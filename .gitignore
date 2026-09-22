@@ -14,6 +14,7 @@ dist/
 .env
 .env.*
 *.env
+*.env.*
 !.env.example
 
 # Keys, certificates and anything named as a secret. Secrets live only in the
