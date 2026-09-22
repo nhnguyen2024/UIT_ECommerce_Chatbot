@@ -41,7 +41,8 @@ ALTER USER CHATBOT_SVC SET DEFAULT_ROLE = NL_PIPELINE, DEFAULT_WAREHOUSE = NL_WH
 GRANT ROLE NL_PIPELINE TO ROLE SYSADMIN;
 
 -- Issue the pipeline's token. Copy the token_secret value from the result into
--- analytics/.env as SNOWFLAKE_PAT='...'. It is shown only once.
+-- analytics/.env as SNOWFLAKE_PAT='...'. It is shown only once. infra/deploy-analytics.sh
+-- then copies it into Key Vault, where the scheduled Azure job reads it.
 ALTER USER CHATBOT_SVC ADD PROGRAMMATIC ACCESS TOKEN NL_PIPELINE_TOKEN
   ROLE_RESTRICTION = 'NL_PIPELINE'
   DAYS_TO_EXPIRY = 60

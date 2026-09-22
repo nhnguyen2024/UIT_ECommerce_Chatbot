@@ -680,7 +680,7 @@ the failure mode this design is exposed to.
 
 **Metrics are pure functions.** All scoring lives in a module with no network
 calls, so every metric is unit tested without spending money. The tests are part
-of the backend's test suite (363 tests).
+of the backend's test suite (377 tests).
 
 **Gold labels are validated against the corpus.** A test asserts every
 `gold_chunks` entry names a chunk that actually exists. A typo there reports

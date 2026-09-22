@@ -206,7 +206,7 @@ Non-obvious decisions, each argued at length in `docs/architecture.md`:
 
 ## 5. Current state
 
-**Working and verified:** 363 backend tests pass (`.venv/bin/python -m pytest -q`,
+**Working and verified:** 377 backend tests pass (`.venv/bin/python -m pytest -q`,
 ~1 s, no database or network). The Angular app builds (`npx ng build`) and every
 page was driven with Playwright against the real backend and model, including
 the full loop: shop → cart → checkout → order created → "track with the
@@ -347,7 +347,7 @@ incompatibilities. Run both before blaming the model.
 
 | Item | State |
 |---|---|
-| Azure CLI | Installed (Homebrew). Signed in to the **UIT directory** with `az login --tenant 2dff09ac-2b3b-4182-9953-2b548e0d0b39 --use-device-code`. A plain `az login` finds **0 subscriptions**. |
+| Azure CLI | Installed (Homebrew). Signed in to the **UIT directory** with `az login --tenant <UIT directory (tenant) id> --use-device-code`. A plain `az login` finds **0 subscriptions**. |
 | Azure subscription | **Azure for Students**, enabled, $100 credit, expires 2027-04-22 |
 | Allowed regions | **Only** `koreacentral`, `japanwest`, `indonesiacentral`, `japaneast`, `eastasia`. `southeastasia`, the deploy script's default, is **blocked** by policy. Use `LOCATION=eastasia`. |
 | Resource providers | `Microsoft.App`, `OperationalInsights`, `ContainerRegistry`, `CognitiveServices` registered; `Microsoft.Web` was still registering |

@@ -5,7 +5,8 @@
 -- raw record is still here and Silver is the only place that needs fixing.
 --
 -- {{ADLS_ACCOUNT}}, {{ADLS_CONTAINER}} and {{ADLS_SAS}} are filled in by
--- analytics/pipeline.py from analytics/.env; the SAS token is read + list only.
+-- analytics/pipeline.py from its environment (Key Vault in the Azure job,
+-- analytics/.env locally); the SAS token is read + list only.
 
 USE ROLE NL_PIPELINE;
 USE WAREHOUSE NL_WH;

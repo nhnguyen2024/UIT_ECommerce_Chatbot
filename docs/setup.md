@@ -36,7 +36,8 @@ cp .env.example .env
 ```
 
 Edit `.env` and set `MONGODB_URI`. Leave `EMBEDDING_MODE=auto` so Atlas
-generates the vectors.
+generates the vectors. Set `ADMIN_PASSWORD` to a long random string: it is the
+staff password for the Operations and Insights pages, which stay locked without it.
 
 Then choose the model provider, with `LLM_PROVIDER`:
 
@@ -117,7 +118,7 @@ cd frontend && npm install && npm start
 ```
 
 Open http://localhost:4200 for the chat and http://localhost:4200/admin for the
-operations dashboard. The Angular dev server proxies `/api` to port 8000, so
+operations dashboard (sign in with `ADMIN_PASSWORD`). The Angular dev server proxies `/api` to port 8000, so
 there is no CORS configuration to do locally.
 
 ## 6. Check it end to end
@@ -155,14 +156,24 @@ Results land in `evals/results/` as JSON plus a Markdown table.
 
 ## 8. Deploy
 
+First deployment, from a machine with Docker and `az login`:
+
 ```bash
-./infra/deploy-backend.sh
+REGISTRY=<registry> BUILD_MODE=local ./infra/deploy-backend.sh
 BACKEND_URL=https://<the url it printed> ./infra/deploy-frontend.sh
+./infra/deploy-analytics.sh     # Key Vault, managed identity, hourly analytics job
+./infra/setup-github-oidc.sh    # lets GitHub Actions deploy without stored secrets
 ```
 
 Then set `CORS_ORIGINS` on the backend to the frontend URL, and widen Atlas
 Network Access so Azure can reach the cluster. Both scripts print the exact
-commands when they finish.
+commands when they finish. Add the three values `setup-github-oidc.sh` prints as
+repository variables in GitHub (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`,
+`AZURE_SUBSCRIPTION_ID`).
+
+After that, every push to `main` deploys through `.github/workflows/ci-cd.yml`:
+tests, then images built on GitHub's runners, then the Container App, the
+analytics job and the Static Web App updated.
 
 ## Troubleshooting
 
@@ -181,5 +192,6 @@ does not include the frontend origin. It is a JSON array, and the scheme must
 match exactly.
 
 **`exec format error` on the Container App.** The image was built for arm64 on an
-Apple Silicon machine. `deploy-backend.sh` uses `az acr build`, which builds in
-Azure and avoids this; do not swap it for a local `docker build && docker push`.
+Apple Silicon machine. Build with `--platform linux/amd64` (what `BUILD_MODE=local`
+and the deploy scripts do), or let GitHub Actions build it; a plain local
+`docker build && docker push` on a Mac produces the wrong architecture.
