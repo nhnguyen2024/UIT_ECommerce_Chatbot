@@ -45,3 +45,5 @@ backend/evals/results/
 analytics/out/
 analytics/.env
 analytics/.venv/
+
+PROJECT.md
